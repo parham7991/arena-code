@@ -117,6 +117,7 @@ fi
 
 say ""
 say "Done! 🎉"
+say "   First-time setup (theme + email + password):   arena setup"
 say "   Start coding:   arena"
 say "   Help:           arena --help"
 say "   Sessions:       arena --sessions"

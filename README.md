@@ -44,7 +44,19 @@ persistent sessions, context management, and a multi-agent team leader.
 
 ## 🚀 Install (easy, like Claude Code)
 
-After install, just type **`arena`** in a terminal to open the interactive UI.
+After install, just type **`arena`** in a terminal to open the interactive UI. On the
+**first run**, run **`arena setup`** — it asks for your **theme**, **email** and
+**password** (stored encrypted, AES-256-GCM), performs a real bridge login, and
+saves everything so later runs re-login automatically.
+
+```bash
+arena setup      # first-run wizard (theme + email + password)
+arena            # start coding
+```
+
+For servers: `bash setup-server.sh` installs Node 20+, the CLI, the bridge,
+Chromium, runs `arena setup`, and starts a bridge (auto-using a Cloudflare WARP
+proxy when present, to avoid 403 reCAPTCHA on datacenter IPs).
 
 ### One-line installer
 
