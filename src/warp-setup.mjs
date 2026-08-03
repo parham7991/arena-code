@@ -134,6 +134,11 @@ async function main() {
   }
 }
 
-if (process.argv[1] && new URL(process.argv[1]).pathname === new URL(import.meta.url).pathname) {
+// Detect direct execution robustly (handles relative + absolute argv[1]).
+const isDirectRun =
+  process.argv[1] &&
+  (import.meta.url.endsWith(path.basename(process.argv[1])) ||
+    import.meta.url === new URL(`file://${process.argv[1]}`).href);
+if (isDirectRun) {
   main().catch((e) => { console.error(`✖ WARP error: ${e.message}`); process.exit(1); });
 }
