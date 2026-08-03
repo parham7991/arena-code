@@ -10,6 +10,8 @@
 // Checks bridge health, loads/creates a session, runs the agent loop, persists
 // history. Without a prompt it launches the ink-based interactive TUI.
 import path from "node:path";
+import fs from "node:fs";
+import os from "node:os";
 import React, { createElement as h } from "react";
 import { render } from "ink";
 import { loadConfig } from "./config.mjs";
@@ -25,7 +27,10 @@ import { autoStartBridge, findRunningBridge, bridgeEnv } from "./auto-bridge.mjs
 
 function bridgeEnvKey(dataDir) {
   try {
-    return bridgeEnv(dataDir).ARENA_AGENT_BRIDGE_KEY || "";
+    // Prefer ~/.arena-bridge (where the bridge actually stores its .env + key).
+    const bridgeDir = path.join(os.homedir(), ".arena-bridge");
+    const env = bridgeEnv(fs.existsSync(bridgeDir) ? bridgeDir : dataDir);
+    return env.ARENA_AGENT_BRIDGE_KEY || "";
   } catch {
     return "";
   }
@@ -299,18 +304,19 @@ async function main() {
   let health = await bridge.healthcheck();
   // If the bridge isn't reachable, try to find or auto-start it (so `arena`
   // just works without the user manually running the bridge).
+  const bridgeDataDir = fs.existsSync(path.join(os.homedir(), ".arena-bridge")) ? path.join(os.homedir(), ".arena-bridge") : config.dataDir;
   if (!health.ok) {
-    const found = await findRunningBridge({ bridgeUrl: config.bridgeUrl, dataDir: config.dataDir });
+    const found = await findRunningBridge({ bridgeUrl: config.bridgeUrl, dataDir: bridgeDataDir });
     if (found) {
       bridgeUrl = found;
-      bridge = new BridgeClient({ url: found, apiKey: config.bridgeKey || (await bridgeEnvKey(config.dataDir)), timeoutMs: config.requestTimeoutMs });
+      bridge = new BridgeClient({ url: found, apiKey: config.bridgeKey || (await bridgeEnvKey(bridgeDataDir)), timeoutMs: config.requestTimeoutMs });
       health = await bridge.healthcheck();
     } else {
       console.log("◇ Starting arena bridge…");
-      const started = await autoStartBridge({ dataDir: config.dataDir, port: config.bridgeUrl ? Number(new URL(config.bridgeUrl).port) || 20999 : 20999 });
+      const started = await autoStartBridge({ dataDir: bridgeDataDir, port: 20999 });
       if (started) {
         bridgeUrl = started;
-        bridge = new BridgeClient({ url: started, apiKey: config.bridgeKey || (await bridgeEnvKey(config.dataDir)), timeoutMs: config.requestTimeoutMs });
+        bridge = new BridgeClient({ url: started, apiKey: config.bridgeKey || (await bridgeEnvKey(bridgeDataDir)), timeoutMs: config.requestTimeoutMs });
         health = await bridge.healthcheck();
       }
     }

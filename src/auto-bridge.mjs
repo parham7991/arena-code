@@ -70,14 +70,17 @@ export async function findRunningBridge({ bridgeUrl, dataDir } = {}) {
 
 /**
  * Auto-start the bridge in the background. Returns the base URL once healthy.
+ * Uses ~/.arena-bridge as the data dir (where credentials.json lives).
  */
 export async function autoStartBridge({ dataDir, port = 20999 } = {}) {
   const dirs = findBridgeDirs();
   if (dirs.length === 0) return null;
   const dir = dirs[0];
-  const env = bridgeEnv(dataDir);
+  // The bridge data dir is ~/.arena-bridge (holds credentials.json + .env).
+  const realDataDir = dataDir || path.join(os.homedir(), ".arena-bridge");
+  const env = bridgeEnv(realDataDir);
   const key = env.ARENA_AGENT_BRIDGE_KEY;
-  const myEnv = { ...process.env, DATA_DIR: dataDir || path.join(os.homedir(), ".arena-bridge"), PORT: String(port) };
+  const myEnv = { ...process.env, DATA_DIR: realDataDir, PORT: String(port) };
   if (key) myEnv.ARENA_AGENT_BRIDGE_KEY = key;
   // Use WARP proxy if present.
   if (await portOpen(40000)) myEnv.ARENA_AGENT_PROXY = "socks5://127.0.0.1:40000";
