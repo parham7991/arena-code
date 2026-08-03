@@ -1,0 +1,63 @@
+{
+  "name": "arena-code",
+  "version": "0.1.0",
+  "description": "Arena Code — a Claude Code / Codex / OpenCode-style terminal coding agent that drives the local arena-account-bridge and executes tools on your local files.",
+  "type": "module",
+  "bin": {
+    "arena-code": "src/cli.mjs"
+  },
+  "main": "src/cli.mjs",
+  "exports": {
+    ".": "./src/cli.mjs",
+    "./team": "./src/team.mjs",
+    "./context": "./src/context.mjs",
+    "./bridge": "./src/bridge.mjs",
+    "./agent": "./src/agent.mjs",
+    "./session": "./src/session.mjs",
+    "./config": "./src/config.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/cli.mjs",
+    "cli": "node src/cli.mjs",
+    "test": "node --test test/tools.test.mjs test/agent-loop.test.mjs test/bridge-stream.test.mjs test/session.test.mjs test/ui.test.mjs test/context.test.mjs test/team.test.mjs",
+    "mock-bridge": "node test/mock-bridge.mjs",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "opencode",
+    "coding-agent",
+    "terminal",
+    "ai",
+    "arena",
+    "cli",
+    "agent"
+  ],
+  "license": "MIT",
+  "author": "AraTmDev <parham7991@users.noreply.github.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/parham7991/arena-code.git"
+  },
+  "bugs": {
+    "url": "https://github.com/parham7991/arena-code/issues"
+  },
+  "homepage": "https://github.com/parham7991/arena-code",
+  "dependencies": {
+    "@inkjs/ui": "^2.0.0",
+    "ink": "^6.8.0",
+    "react": "^19.2.8"
+  }
+}

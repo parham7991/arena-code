@@ -1,0 +1,12 @@
+# Source/test files not shipped in the npm package
+test/
+docs/
+assets/
+
+# Dev / local
+node_modules/
+*.log
+*.tgz
+sessions/
+.git/
+.github/
