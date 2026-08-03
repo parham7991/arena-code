@@ -11,7 +11,7 @@
 set -euo pipefail
 
 ARENA_DIR="${ARENA_DIR:-$HOME/.arena-code}"
-NODE_MIN=18
+NODE_MIN=20   # ink (the TUI) requires Node 20+ (unicode-set regex)
 
 say() { printf '\033[1;32m%s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m%s\033[0m\n' "$*"; }
@@ -49,7 +49,9 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 NODE_MAJOR=$(node -e "console.log(process.versions.node.split('.')[0])")
 if (( NODE_MAJOR < NODE_MIN )); then
-  err "Node.js $NODE_MIN+ required (found $(node --version))."
+  err "Node.js $NODE_MIN+ required (found $(node --version)). The TUI needs Node 20+."
+  err "Upgrade Node, then re-run. On Ubuntu/Debian:"
+  err "  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs"
   exit 1
 fi
 say "✔ Node $(node --version) detected"
