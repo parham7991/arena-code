@@ -106,14 +106,22 @@ if [[ -f "$HOME/.arena-bridge/credentials.json" ]]; then
   sleep 1
   cd "$BRIDGE_DIR"
   export DATA_DIR="$HOME/.arena-bridge"
-  export PORT="${ARENA_BRIDGE_PORT:-20999}"
+  BRIDGE_PORT="${ARENA_BRIDGE_PORT:-20999}"
+  export PORT="$BRIDGE_PORT"
   [[ -f "$DATA_DIR/.env" ]] && export ARENA_AGENT_BRIDGE_KEY=$(grep "^ARENA_AGENT_BRIDGE_KEY=" "$DATA_DIR/.env" | cut -d= -f2)
   if (( HAS_WARP )); then export ARENA_AGENT_PROXY="socks5://127.0.0.1:$WARP_PORT"; fi
   nohup node src/index.mjs > /tmp/arena-bridge.log 2>&1 &
   sleep 6
-  curl -s --max-time 5 "http://127.0.0.1:${ARENA_BRIDGE_PORT:-20999}/health" | grep -q '"ok":true' \
+  curl -s --max-time 5 "http://127.0.0.1:$BRIDGE_PORT/health" | grep -q '"ok":true' \
     && say "✔ Bridge running" || warn "Bridge not up — check /tmp/arena-bridge.log"
-  grep -q '^export ARENA_BRIDGE_URL=' "$HOME/.bashrc" 2>/dev/null || echo "export ARENA_BRIDGE_URL=\"http://127.0.0.1:${ARENA_BRIDGE_PORT:-20999}\"" >> "$HOME/.bashrc"
+
+  # Persist bridge URL + PORT + key into the bridge .env so `arena` auto-discovers
+  # them without needing a freshly sourced shell (fixes 401 Invalid bridge key).
+  if [[ -f "$DATA_DIR/.env" ]]; then
+    grep -q '^PORT=' "$DATA_DIR/.env" 2>/dev/null || echo "PORT=$BRIDGE_PORT" >> "$DATA_DIR/.env"
+    grep -q '^ARENA_AGENT_BRIDGE_URL=' "$DATA_DIR/.env" 2>/dev/null || echo "ARENA_AGENT_BRIDGE_URL=http://127.0.0.1:$BRIDGE_PORT" >> "$DATA_DIR/.env"
+  fi
+  grep -q '^export ARENA_BRIDGE_URL=' "$HOME/.bashrc" 2>/dev/null || echo "export ARENA_BRIDGE_URL=\"http://127.0.0.1:$BRIDGE_PORT\"" >> "$HOME/.bashrc"
   [[ -n "${ARENA_AGENT_BRIDGE_KEY:-}" ]] && { grep -q '^export ARENA_BRIDGE_KEY=' "$HOME/.bashrc" 2>/dev/null || echo "export ARENA_BRIDGE_KEY=\"$ARENA_AGENT_BRIDGE_KEY\"" >> "$HOME/.bashrc"; }
 fi
 
