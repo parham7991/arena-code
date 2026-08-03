@@ -41,7 +41,7 @@
   "scripts": {
     "start": "node src/cli.mjs",
     "cli": "node src/cli.mjs",
-    "test": "node --test test/tools.test.mjs test/agent-loop.test.mjs test/bridge-stream.test.mjs test/session.test.mjs test/ui.test.mjs test/context.test.mjs test/team.test.mjs test/hooks.test.mjs test/skills.test.mjs test/plugins.test.mjs test/diff.test.mjs test/theme-i18n.test.mjs test/commands.test.mjs test/mcp.test.mjs test/subagent.test.mjs test/auth.test.mjs",
+    "test": "node --test test/tools.test.mjs test/agent-loop.test.mjs test/bridge-stream.test.mjs test/session.test.mjs test/ui.test.mjs test/context.test.mjs test/team.test.mjs test/hooks.test.mjs test/skills.test.mjs test/plugins.test.mjs test/diff.test.mjs test/theme-i18n.test.mjs test/commands.test.mjs test/mcp.test.mjs test/subagent.test.mjs test/auth.test.mjs test/auto-bridge.test.mjs",
     "mock-bridge": "node test/mock-bridge.mjs",
     "prepublishOnly": "npm test"
   },

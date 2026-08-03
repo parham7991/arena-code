@@ -21,6 +21,15 @@ import { systemPromptWithMemoryNote, loadProjectMemory } from "./prompts/memory.
 import { manageContextAsync, compactMessagesWithLLM, messagesTokens, pruneToolMessages } from "./context.mjs";
 import { runTeam } from "./team.mjs";
 import { createRuntime } from "./runtime.mjs";
+import { autoStartBridge, findRunningBridge, bridgeEnv } from "./auto-bridge.mjs";
+
+function bridgeEnvKey(dataDir) {
+  try {
+    return bridgeEnv(dataDir).ARENA_AGENT_BRIDGE_KEY || "";
+  } catch {
+    return "";
+  }
+}
 import { BANNER, formatBanner } from "./banner.mjs";
 import { runSelfTest, formatReport } from "./selftest.mjs";
 import { runSetup } from "./setup.mjs";
@@ -287,7 +296,25 @@ async function main() {
   const projectRoot = path.resolve(args.cwd);
   const bridge = new BridgeClient({ url: bridgeUrl, apiKey: bridgeKey, timeoutMs: config.requestTimeoutMs });
 
-  const health = await bridge.healthcheck();
+  let health = await bridge.healthcheck();
+  // If the bridge isn't reachable, try to find or auto-start it (so `arena`
+  // just works without the user manually running the bridge).
+  if (!health.ok) {
+    const found = await findRunningBridge({ bridgeUrl: config.bridgeUrl, dataDir: config.dataDir });
+    if (found) {
+      bridgeUrl = found;
+      bridge = new BridgeClient({ url: found, apiKey: config.bridgeKey || (await bridgeEnvKey(config.dataDir)), timeoutMs: config.requestTimeoutMs });
+      health = await bridge.healthcheck();
+    } else {
+      console.log("◇ Starting arena bridge…");
+      const started = await autoStartBridge({ dataDir: config.dataDir, port: config.bridgeUrl ? Number(new URL(config.bridgeUrl).port) || 20999 : 20999 });
+      if (started) {
+        bridgeUrl = started;
+        bridge = new BridgeClient({ url: started, apiKey: config.bridgeKey || (await bridgeEnvKey(config.dataDir)), timeoutMs: config.requestTimeoutMs });
+        health = await bridge.healthcheck();
+      }
+    }
+  }
   if (!health.ok) {
     console.error(`✖ Arena bridge not reachable at ${bridgeUrl}.`);
     console.error(`  ${health.error ? `(${health.error})` : `HTTP ${health.status}`}`);
