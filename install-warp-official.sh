@@ -2,9 +2,16 @@
 # Install the official Cloudflare WARP client (warp-svc) which provides a
 # working SOCKS5 proxy on 127.0.0.1:40000 that Chromium can use (unlike wireproxy).
 # This is the reliable way to avoid 403 reCAPTCHA on datacenter IPs.
+# Works as root, or as a sudo-capable user (e.g. GitHub Codespaces).
 set -euo pipefail
 say(){ printf '\033[1;32m%s\033[0m\n' "$*"; }
 err(){ printf '\033[1;31m%s\033[0m\n' "$*" >&2; }
+
+# Use sudo when we're not root (e.g. Codespaces).
+SUDO=""
+if [[ "$(id -u)" != "0" ]]; then
+  if command -v sudo >/dev/null 2>&1; then SUDO="sudo"; fi
+fi
 
 # Already installed + running?
 if command -v warp-cli >/dev/null 2>&1; then
@@ -16,28 +23,28 @@ if ss -ltnp 2>/dev/null | grep -q ':40000 '; then
   exit 0
 fi
 
-# 1. Add Cloudflare apt repo (official)
+# 1. Add Cloudflare apt repo (official) — needs root/sudo
 if ! command -v warp-cli >/dev/null 2>&1; then
   say "Adding Cloudflare WARP apt repo…"
-  curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg 2>/dev/null || true
-  echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ jammy main" > /etc/apt/sources.list.d/cloudflare-client.list
-  apt-get update -qq 2>/dev/null || true
+  curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | $SUDO gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg 2>/dev/null || true
+  echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ jammy main" | $SUDO tee /etc/apt/sources.list.d/cloudflare-client.list >/dev/null 2>&1
+  $SUDO apt-get update -qq 2>/dev/null || true
 fi
 
 # 2. Install cloudflare-warp
 if ! command -v warp-cli >/dev/null 2>&1; then
   say "Installing cloudflare-warp…"
-  apt-get install -y cloudflare-warp 2>&1 | tail -3 || { err "install failed"; exit 1; }
+  $SUDO apt-get install -y cloudflare-warp 2>&1 | tail -3 || { err "install failed (need sudo/root). Run install-warp-official.sh as root or with sudo."; exit 1; }
 fi
 say "✔ cloudflare-warp installed"
 
 # 2b. Ensure the warp-svc daemon is running (systemd, or background fallback for containers).
 if ! pgrep -f warp-svc >/dev/null 2>&1; then
   say "Starting warp-svc daemon…"
-  systemctl enable --now warp-svc 2>/dev/null || systemctl start warp-svc 2>/dev/null || true
+  $SUDO systemctl enable --now warp-svc 2>/dev/null || $SUDO systemctl start warp-svc 2>/dev/null || true
   sleep 3
   if ! pgrep -f warp-svc >/dev/null 2>&1; then
-    nohup warp-svc > /tmp/warp-svc.log 2>&1 &
+    $SUDO nohup warp-svc > /tmp/warp-svc.log 2>&1 &
     sleep 4
   fi
 fi
