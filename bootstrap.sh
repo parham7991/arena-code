@@ -9,6 +9,7 @@ ARENA_URL="${ARENA_URL:-https://github.com/parham7991/arena-code.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.arena-code/repo}"
 
 say() { printf '\033[1;32m%s\033[0m\n' "$*"; }
+warn() { printf '\033[1;33m%s\033[0m\n' "$*"; }
 err() { printf '\033[1;31m%s\033[0m\n' "$*" >&2; }
 
 if ! command -v git >/dev/null 2>&1; then
@@ -23,9 +24,22 @@ if [[ ! -d "$INSTALL_DIR/.git" ]]; then
     err "Clone failed. Check network / URL."
     exit 1
   }
+else
+  say "Updating arena-code (git pull)…"
+  (cd "$INSTALL_DIR" && git pull --ff-only 2>/dev/null || warn "Could not update; using existing copy.")
 fi
 
 cd "$INSTALL_DIR"
+
+# Re-link the `arena` command to the current source.
+mkdir -p "$HOME/.local/bin"
+ln -sf "$INSTALL_DIR/src/cli.mjs" "$HOME/.local/bin/arena" 2>/dev/null || true
+chmod +x "$INSTALL_DIR/src/cli.mjs"
+# Ensure PATH includes ~/.local/bin (persist to profile once).
+case ":$PATH:" in
+  *":$HOME/.local/bin:"*) ;;
+  *) export PATH="$HOME/.local/bin:$PATH" ;;
+esac
 
 # Forward ARENA_EMAIL / ARENA_PASSWORD as --email/--password flags so the
 # bridge login actually receives the credentials.
