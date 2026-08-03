@@ -23,6 +23,8 @@ import { runTeam } from "./team.mjs";
 import { createRuntime } from "./runtime.mjs";
 import { BANNER, formatBanner } from "./banner.mjs";
 import { runSelfTest, formatReport } from "./selftest.mjs";
+import { runSetup } from "./setup.mjs";
+import { hasCredentials, loadCredentials } from "./auth.mjs";
 import { ArenaApp } from "./ui/app.mjs";
 
 function printHelp() {
@@ -35,6 +37,7 @@ USAGE:
   arena-code team "<task>"       Break a task into sub-tasks and run them as a team.
   arena-code --sessions          List this project's saved sessions.
   arena-code --selftest          Run an offline self-check (mock bridge).
+  arena-code setup               First-run wizard (theme + email + password, saved securely).
 
 OPTIONS:
   -p, --prompt <text>    The task for the agent.
@@ -82,6 +85,8 @@ function parseArgs(argv) {
     else if (a === "--session" || a === "--session-id") out.session = rest.shift() ?? "";
     else if (a === "--sessions") out.sessions = true;
     else if (a === "--selftest") out.selftest = true;
+    else if (a === "setup" || a === "--setup") out.setup = true;
+    else if (a === "--login") out.setup = true; // alias: re-run setup to log in
     else if (a.startsWith("-")) { /* unknown flag */ }
     else if (!out.prompt) out.prompt = a;
   }
@@ -251,6 +256,13 @@ async function main() {
     const report = await runSelfTest({ cwd: args.cwd });
     console.log(formatReport(report));
     process.exitCode = report.passed ? 0 : 1;
+    return;
+  }
+
+  // First-run setup wizard / login (works even without a running bridge).
+  if (args.setup) {
+    const result = await runSetup({ env: process.env });
+    process.exitCode = result.configured ? 0 : 1;
     return;
   }
 
