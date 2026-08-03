@@ -71,12 +71,17 @@ if ! command -v arena >/dev/null 2>&1; then
   if [[ -f "$HOME/.local/bin/arena" || -f "$ARENA_DIR/bin/arena" ]]; then :; fi
   mkdir -p "$HOME/.local/bin"
   ln -sf "$THIS_DIR/src/cli.mjs" "$HOME/.local/bin/arena" 2>/dev/null || true
+  chmod +x "$THIS_DIR/src/cli.mjs"
   case ":$PATH:" in
     *":$HOME/.local/bin:"*) ;;
-    *) export PATH="$HOME/.local/bin:$PATH"
-       warn "Added $HOME/.local/bin to PATH for this session. Add it to your shell profile:"
-       warn '  echo '\''export PATH="$HOME/.local/bin:$PATH"'\'' >> ~/.bashrc' ;;
+    *) export PATH="$HOME/.local/bin:$PATH" ;;
   esac
+  LINE='export PATH="$HOME/.local/bin:$PATH"'
+  for RC in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+    if [[ -f "$RC" ]] && ! grep -qF "$LINE" "$RC" 2>/dev/null; then
+      echo "$LINE" >> "$RC" 2>/dev/null && { say "✔ Added ~/.local/bin to PATH in $RC"; break; }
+    fi
+  done
 fi
 say "✔ 'arena' command ready"
 

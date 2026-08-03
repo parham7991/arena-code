@@ -26,6 +26,17 @@ if [[ ! -d "$INSTALL_DIR/.git" ]]; then
 fi
 
 cd "$INSTALL_DIR"
-bash install.sh "$@"
 
-say "Bootstrap complete. Run:  arena"
+# Forward ARENA_EMAIL / ARENA_PASSWORD as --email/--password flags so the
+# bridge login actually receives the credentials.
+EXTRA=()
+if [[ -n "${ARENA_EMAIL:-}" ]]; then EXTRA+=(--email "$ARENA_EMAIL"); fi
+if [[ -n "${ARENA_PASSWORD:-}" ]]; then EXTRA+=(--password "$ARENA_PASSWORD"); fi
+
+bash install.sh "$@" "${EXTRA[@]}"
+
+say "Bootstrap complete."
+echo ""
+echo "Add 'arena' to your PATH for future shells (once):"
+echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc && source ~/.bashrc"
+echo "Then run:  arena"

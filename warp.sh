@@ -12,6 +12,7 @@ WARP_DIR="$ARENA_DIR/warp"
 PORT="${ARENA_WARP_PORT:-40000}"
 
 say() { printf '\033[1;32m%s\033[0m\n' "$*"; }
+warn() { printf '\033[1;33m%s\033[0m\n' "$*"; }
 err() { printf '\033[1;31m%s\033[0m\n' "$*" >&2; }
 
 CMD="${1:-all}"
