@@ -1,0 +1,18 @@
+#compdef arena
+# Zsh completion for Arena Code's `arena` command.
+_arena() {
+  local -a subcommands flags
+  subcommands=(
+    'team:Run as a multi-agent team leader'
+    '--sessions:List saved sessions'
+    '--selftest:Run an offline self-check'
+  )
+  flags=(
+    '-p[prompt]:prompt:' '-c[cwd]:dir:_directories' '-k[key]:key:' '-u[url]:url:'
+    '-m[max-turns]:num:' '-a[autonomy]:policy:' '--stream' '--no-stream'
+    '--continue' '--session[continue a session]:id:' '--session-id[id]:id:'
+    '--theme[theme]:name:' '--lang[lang]:code:' '-h[help]'
+  )
+  _arguments -s $flags $subcommands
+}
+_arena "$@"

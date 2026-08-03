@@ -42,16 +42,27 @@ persistent sessions, context management, and a multi-agent team leader.
 
 ---
 
-## 🚀 Install
+## 🚀 Install (easy, like Claude Code)
+
+After install, just type **`arena`** in a terminal to open the interactive UI.
+
+### One-line installer
+
+```bash
+# Install from the repo (sets up `arena` command + optional bridge + WARP)
+curl -fsSL https://raw.githubusercontent.com/parham7991/arena-code/main/bootstrap.sh | bash
+
+# With the bridge + WARP proxy (recommended for real usage):
+curl -fsSL https://raw.githubusercontent.com/parham7991/arena-code/main/bootstrap.sh | \
+  ARENA_EMAIL=you@example.com ARENA_PASSWORD='your-password' bash -s -- --bridge --warp
+```
 
 ### Global / npx
 
 ```bash
-npm install -g arena-code          # global install
-npx arena-code --help              # or run via npx without installing
-
-# Once published, this is the same as:
-npx arena-code -p "hello" --cwd ./my-project
+npm install -g arena-code          # global install (provides `arena` AND `arena-code`)
+npx arena --help                   # or run via npx without installing
+npx arena --selftest               # verify everything works (offline)
 ```
 
 ### From source (development)
@@ -59,10 +70,34 @@ npx arena-code -p "hello" --cwd ./my-project
 ```bash
 git clone https://github.com/parham7991/arena-code.git
 cd arena-code
-npm install                          # ink / react / @inkjs/ui
-npm link                             # make `arena-code` available on PATH
-npm test                             # 63 tests
+npm install                          # ink / react / @inkjs/ui / js-yaml
+npm link                             # make `arena` available on PATH
+npm test                             # 107 tests
+node src/cli.mjs --selftest          # offline self-check
 ```
+
+### Shell completion (optional)
+
+```bash
+# bash
+echo 'source ~/.local/share/arena/completions/arena.bash' >> ~/.bashrc
+# zsh
+echo 'fpath+=(path/to/arena/completions)' >> ~/.zshrc  # and `autoload -U compinit; compinit`
+```
+
+### WARP proxy (avoid Cloudflare challenges)
+
+Arena Code includes a **pure-Node WARP setup** that registers a free Cloudflare
+WARP account and starts a SOCKS5 proxy on `127.0.0.1:40000`, so the bridge avoids
+Cloudflare "Just a moment…" checks.
+
+```bash
+bash warp.sh            # register WARP account + start proxy
+# Then run the bridge with:
+export ARENA_AGENT_PROXY=socks5://127.0.0.1:40000
+```
+
+You can also install with `--warp` to set it up automatically:
 
 ### Prerequisite: the bridge
 

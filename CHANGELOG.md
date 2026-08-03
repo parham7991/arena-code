@@ -8,9 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased]
+## [0.2.0] - 2026-08-03
 
-- (placeholder for the next release)
+### Added
+
+- **Easy install like Claude Code** — one-line `bootstrap.sh`, full `install.sh`
+  (Node check, installs `arena` + optional bridge + WARP), and the **`arena`**
+  command alias alongside `arena-code`.
+- **ASCII startup banner** with session/project/autonomy/tools/plugins/theme/
+  lang/warp status.
+- **WARP proxy setup** — `warp.sh` + pure-Node `src/warp-setup.mjs` that
+  registers a free Cloudflare WARP account and starts a SOCKS5 proxy
+  (`127.0.0.1:40000`) to avoid Cloudflare challenges.
+- **`arena --selftest`** — offline self-check that boots an inline mock bridge
+  and verifies runtime, plugins, skills, tools, commands, and a real agent turn.
+- **Shell completion** for bash and zsh.
 
 ---
 
@@ -75,5 +87,6 @@ and executes tools on your local files.
 
 ---
 
-[Unreleased]: https://github.com/parham7991/arena-code/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/parham7991/arena-code/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/parham7991/arena-code/releases/tag/v0.2.0
 [0.1.0]: https://github.com/parham7991/arena-code/releases/tag/v0.1.0

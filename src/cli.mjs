@@ -21,6 +21,8 @@ import { systemPromptWithMemoryNote, loadProjectMemory } from "./prompts/memory.
 import { manageContextAsync, compactMessagesWithLLM, messagesTokens, pruneToolMessages } from "./context.mjs";
 import { runTeam } from "./team.mjs";
 import { createRuntime } from "./runtime.mjs";
+import { BANNER, formatBanner } from "./banner.mjs";
+import { runSelfTest, formatReport } from "./selftest.mjs";
 import { ArenaApp } from "./ui/app.mjs";
 
 function printHelp() {
@@ -32,6 +34,7 @@ USAGE:
   arena-code "<prompt>" [opts]   One-shot task.
   arena-code team "<task>"       Break a task into sub-tasks and run them as a team.
   arena-code --sessions          List this project's saved sessions.
+  arena-code --selftest          Run an offline self-check (mock bridge).
 
 OPTIONS:
   -p, --prompt <text>    The task for the agent.
@@ -78,6 +81,7 @@ function parseArgs(argv) {
     else if (a === "--continue") out.cont = true;
     else if (a === "--session" || a === "--session-id") out.session = rest.shift() ?? "";
     else if (a === "--sessions") out.sessions = true;
+    else if (a === "--selftest") out.selftest = true;
     else if (a.startsWith("-")) { /* unknown flag */ }
     else if (!out.prompt) out.prompt = a;
   }
@@ -242,6 +246,14 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) return printHelp();
 
+  // Self-test (offline, uses the mock bridge).
+  if (args.selftest) {
+    const report = await runSelfTest({ cwd: args.cwd });
+    console.log(formatReport(report));
+    process.exitCode = report.passed ? 0 : 1;
+    return;
+  }
+
   // Build the runtime (config + i18n + theme + plugins + skills + commands + tools).
   const runtime = await createRuntime({
     env: { ...process.env, ARENA_CWD: args.cwd },
@@ -329,7 +341,21 @@ async function main() {
 
   // --- Interactive mode ---
   if (!args.prompt) {
-    console.log(`● Arena Code — bridge ${health.status === 200 ? "OK" : "UP"} · session ${sessionId}${memoryActive ? " · memory ✔" : ""}${runtime.plugins.length ? ` · plugins ${runtime.plugins.length}` : ""}`);
+    const bridgeStatus = health.status === 200 ? "OK" : "UP";
+    console.log(BANNER);
+    console.log(formatBanner({
+      sessionId,
+      projectRoot,
+      autonomy,
+      memoryActive,
+      pluginCount: runtime.plugins.length,
+      bridgeStatus,
+      toolCount: tools.length,
+      theme: runtime.theme?.name || "default",
+      lang: runtime.i18n?.code || "en",
+      warp: Boolean(process.env.ARENA_AGENT_PROXY),
+    }));
+    console.log("");
     return runInteractive({ engine, sessionId, projectRoot, autonomy, runtime, store, config });
   }
 
