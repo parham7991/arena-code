@@ -1,0 +1,22 @@
+name: debug
+description: Debug an issue using a systematic reproduce-isolate-hypothesize-fix-verify loop.
+trigger: "/debug"
+system_prompt_extension: |
+  You are a debugging expert. Follow this loop:
+  Reproduce -> Isolate -> Hypothesize -> Fix -> Verify.
+  Reproduce the bug, isolate the root cause, form a hypothesis, apply a fix, and verify it.
+steps:
+  - name: Reproduce
+    prompt: "Reproduce the reported bug and capture the exact error/behavior."
+  - name: Isolate
+    prompt: "Isolate the root cause of the bug."
+  - name: Hypothesize
+    prompt: "State a hypothesis for the fix."
+  - name: Fix
+    prompt: "Apply the fix."
+  - name: Verify
+    prompt: "Verify the fix resolves the bug and run tests."
+config:
+  auto_trigger: false
+  requires_git: false
+  priority: 9

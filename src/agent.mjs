@@ -3,6 +3,7 @@
 // Supports both non-streaming and streaming (SSE) bridge clients (M2).
 import { runTool } from "./tools/registry.mjs";
 import { SYSTEM_PROMPT } from "./prompts/sys.mjs";
+import { hookBus } from "./hooks.mjs";
 
 /**
  * Accumulate a streamed SSE chunk into a running assistant-message accumulator.
@@ -82,6 +83,7 @@ export async function runAgent({
 
   for (let turn = 0; turn < maxTurns; turn++) {
     onTurn?.(turn + 1, msgs.length);
+    hookBus.notify("onTurnStart", { turn: turn + 1, messages: msgs, ctx }).catch(() => {});
 
     // a. Ask the model.
     let finishReason;
@@ -106,6 +108,7 @@ export async function runAgent({
       onContent?.(content, finishReason);
       msgs.push({ role: "assistant", content });
       onSave?.(msgs);
+      hookBus.notify("onTurnEnd", { turn: turn + 1, result: { status: "done", content }, ctx }).catch(() => {});
       return { status: "done", content, turns: turn + 1, messages: msgs };
     }
 
@@ -123,17 +126,22 @@ export async function runAgent({
       const callId = call?.id || `tc_${turn}_${Math.random().toString(36).slice(2, 8)}`;
 
       onToolCall?.({ id: callId, name, args });
-      const result = await runTool(name, args, ctx);
-      onToolResult?.({ id: callId, name, result });
+      let toolCtx = { tool: name, args, ctx, callId };
+      toolCtx = (await hookBus.emit("onToolBefore", toolCtx)) || toolCtx;
+      const result = await runTool(toolCtx.tool || name, toolCtx.args || args, ctx);
+      const afterData = await hookBus.emit("onToolAfter", { tool: name, args, result, ctx, callId });
+      const effectiveResult = afterData?.result !== undefined ? afterData.result : result;
+      onToolResult?.({ id: callId, name, result: effectiveResult });
 
       msgs.push({
         role: "tool",
         tool_call_id: callId,
         name: name || "",
-        content: typeof result === "string" ? result : JSON.stringify(result),
+        content: typeof effectiveResult === "string" ? effectiveResult : JSON.stringify(effectiveResult),
       });
     }
     onSave?.(msgs);
+    hookBus.notify("onTurnEnd", { turn: turn + 1, result: { status: "tools", messages: msgs }, ctx }).catch(() => {});
   }
 
   // d. Max turns reached without the model stopping.

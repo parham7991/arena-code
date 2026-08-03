@@ -1,0 +1,17 @@
+name: test
+description: Write or improve tests for the codebase.
+trigger: "/test"
+system_prompt_extension: |
+  You are a test engineer. Write clear, robust tests that cover the important
+  cases including edge cases. Follow the project's test conventions and run the tests.
+steps:
+  - name: فهم کد
+    prompt: "Understand the code under test and identify the key behaviors to cover."
+  - name: نوشتن تست
+    prompt: "Write tests covering the main behavior and edge cases."
+  - name: اجرا
+    prompt: "Run the tests and fix any failures."
+config:
+  auto_trigger: false
+  requires_git: false
+  priority: 7

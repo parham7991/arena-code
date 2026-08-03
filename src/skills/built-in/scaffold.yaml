@@ -1,0 +1,17 @@
+name: scaffold
+description: Scaffold a new project structure.
+trigger: "/scaffold"
+system_prompt_extension: |
+  You are a project scaffolder. Create a clean, idiomatic project structure for
+  the requested stack, including config files, a README, and a minimal working example.
+steps:
+  - name: طرح ساختار
+    prompt: "Design the project structure and file layout."
+  - name: ساخت
+    prompt: "Create the project files."
+  - name: اعتبارسنجی
+    prompt: "Verify the scaffold works (e.g. install/build if appropriate)."
+config:
+  auto_trigger: false
+  requires_git: false
+  priority: 6

@@ -1,0 +1,11 @@
+name: security-audit
+description: Audit the codebase for security vulnerabilities.
+trigger: "/security"
+system_prompt_extension: |
+  You are a security auditor. Inspect the code for vulnerabilities such as
+  injection, XSS, insecure deserialization, secrets in code, unsafe dependencies,
+  and missing authorization. Report findings with severity and remediation.
+config:
+  auto_trigger: false
+  requires_git: false
+  priority: 9

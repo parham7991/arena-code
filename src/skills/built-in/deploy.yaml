@@ -1,0 +1,19 @@
+name: deploy
+description: Deploy the application.
+trigger: "/deploy"
+system_prompt_extension: |
+  You are a DevOps engineer. Prepare and execute a safe deployment. Verify the
+  target environment, run build steps, and provide rollback instructions.
+steps:
+  - name: بررسی
+    prompt: "Inspect the deployment configuration and target environment."
+  - name: ساخت
+    prompt: "Run the build steps."
+  - name: دیپلوی
+    prompt: "Deploy the build."
+  - name: تأیید
+    prompt: "Verify the deployment and note rollback steps."
+config:
+  auto_trigger: false
+  requires_git: false
+  priority: 5

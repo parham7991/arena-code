@@ -362,3 +362,53 @@ arena-code/
 ---
 
 *ساخته‌شده برای ساخت مشترک؛ هر بخشی را که دوست داری اول عمیق‌تر کنیم، بگو.*
+
+---
+
+## M4+ — Skills, Plugins, MCP, Hooks, Diff, Watcher, i18n, Theme
+
+### Skills (reusable workflows)
+
+- YAML/JSON definitions loaded from project `.arena-code/skills/` > user `~/.arena-code/skills/` > built-in `src/skills/built-in/`.
+- A skill carries `system_prompt_extension`, optional `steps` (guided sub-turns), and optional `tools_override`/`tools_extra`.
+- `runSkill()` augments the system prompt and runs a single pass or guided steps; `composeSkills()` chains multiple skills.
+- Built-ins: `code-review`, `refactor`, `debug`, `test`, `scaffold`, `deploy`, `security-audit`, `docs`, `translate`, `explain`.
+
+### Plugins (capability extensions)
+
+- Plugin API: `{ name, version, description, tools[], commands[], skills[], hooks{}, middleware[], onInit, onDestroy, onConfig }`.
+- Loaded from project/user/npm (`arena-code-plugin-*`); built-ins enabled by default, disabled via `.arena-code/plugins.json`.
+- `PluginRegistry` aggregates tools/commands/skills/hooks; `hookBus` is global.
+- Built-ins: `git`, `snapshot`, `linter`, `testing`, `telemetry`, `docker`, `database`, `ci`, `web`.
+
+### Hooks & events
+
+- `hookBus.on/off/emit` with priority ordering; `emit` returns transformed data for "Before" events.
+- Events: `onSessionStart/End`, `onTurnStart/End`, `onToolBefore/After`, `onBridgeBefore/After`, `onMessageAdd`, `onContextPrune/Compact`, `onError`, `onSkillStart/End`, `onPluginLoad`, `onSlashCommand`, `onExternalChange`.
+- Wired into `agent.mjs` (turn/tool/message/error) so plugins react to real events.
+
+### MCP client
+
+- `McpClient` spawns a stdio MCP server and speaks newline-delimited JSON-RPC 2.0.
+- `McpRegistry` reads `.arena-code/mcp.json`, connects servers, and merges MCP tools (converted to OpenAI function-calling via `McpAdapter`).
+- External MCP servers require the user's environment; the client fails gracefully.
+
+### Diff, watcher, sub-agents
+
+- `diff.mjs`: unified diff (system `diff`) with an LCS fallback, color formatter, and summary.
+- `watcher.mjs`: `fs.watch` on the project, emitting `onExternalChange`.
+- `subagent.mjs`: `spawnSubAgent` / `runSubAgents` with per-sub-agent `x-codex-session-id` (max 3 concurrent).
+
+### i18n & theme
+
+- `i18n.mjs` with `en`/`fa` locales; `theme.mjs` with 7 themes + `theme.json` overrides.
+- The TUI uses the runtime's theme colors and i18n labels.
+
+### Slash commands
+
+- `CommandRegistry` + built-in handlers in `commands/index.mjs` (`/help`, `/compact`, `/skills`, `/skill`, `/plugins`, `/sessions`, `/diff`, `/snap`, `/stats`, `/theme`, `/lang`, `/config`, `/git`, `/review`, `/debug`, `/team`, …).
+- The TUI routes `/`-input through the registry.
+
+### Runtime
+
+- `runtime.mjs` builds the shared context (config, i18n, theme, plugins, skills, tools, command registry) used by both the CLI and TUI.

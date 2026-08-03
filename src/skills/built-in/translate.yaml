@@ -1,0 +1,10 @@
+name: translate
+description: Translate code or comments to another language.
+trigger: "/translate"
+system_prompt_extension: |
+  You are a code translator. Translate the given code or comments into the
+  requested target language while preserving behavior, identifiers, and structure.
+config:
+  auto_trigger: false
+  requires_git: false
+  priority: 3

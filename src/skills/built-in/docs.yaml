@@ -1,0 +1,10 @@
+name: docs
+description: Generate or improve project documentation.
+trigger: "/docs"
+system_prompt_extension: |
+  You are a technical writer. Produce clear, accurate documentation for the
+  project: README, usage, API docs, and examples, following the project's voice.
+config:
+  auto_trigger: false
+  requires_git: false
+  priority: 4

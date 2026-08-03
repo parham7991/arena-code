@@ -8,7 +8,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/Node-%3E%3D18-339933.svg)](package.json)
-[![Tests](https://img.shields.io/badge/Tests-63%20passing-10B981.svg)](#-tests)
+[![Tests](https://img.shields.io/badge/Tests-107%20passing-10B981.svg)](#-tests)
 [![Made by](https://img.shields.io/badge/Made%20by-AraTmDev-F43F5E.svg)](https://github.com/parham7991)
 
 </div>
@@ -34,6 +34,11 @@ persistent sessions, context management, and a multi-agent team leader.
 - **Project memory** — `ARENA_CODE.md` is folded into the system prompt (like `CLAUDE.md` / `AGENTS.md`).
 - **Context management** — token estimate, automatic pruning of large tool results, and `/compact` with LLM-based summarization.
 - **Multi-agent Team Leader** — `arena-code team "task"` breaks the work into sub-tasks and runs them in parallel.
+- **Skills** — reusable workflows (code-review, refactor, debug, test, …) as YAML in `.arena-code/skills/`.
+- **Plugins** — add tools/commands/hooks; built-ins include git, snapshot, linter, testing, telemetry, docker, database, ci, web.
+- **Hooks/Events bus** — plugins/skills can subscribe to lifecycle events.
+- **MCP client** — connect MCP stdio servers via `.arena-code/mcp.json`.
+- **Diff viewer, file watcher, sub-agents, i18n (en/fa), themes**, and a full slash-command set.
 
 ---
 
@@ -152,10 +157,85 @@ feeds results back, looping until the task is done.
 
 ---
 
+## 🧠 Skills, Plugins, MCP (M4+)
+
+### Skills
+
+Skills are reusable workflows. Built-ins (loaded by default, run on demand):
+
+`code-review`, `refactor`, `debug`, `test`, `scaffold`, `deploy`, `security-audit`,
+`docs`, `translate`, `explain`.
+
+```bash
+# In the TUI
+/skills            # list skills
+/skill code-review # run a skill
+/skill-create      # wizard to create a new skill
+```
+
+Add your own skills as YAML (or JSON) in:
+- project: `.arena-code/skills/*.yaml` (highest priority)
+- user: `~/.arena-code/skills/*.yaml`
+- built-in: `src/skills/built-in/*.yaml`
+
+```yaml
+name: my-skill
+description: Does something useful
+trigger: "/my"
+system_prompt_extension: |
+  You are an expert at this thing.
+steps:
+  - name: step 1
+    prompt: Do the first thing.
+```
+
+### Plugins
+
+Plugins add tools/commands/hooks. Built-ins are enabled by default and can be
+disabled via `.arena-code/plugins.json`. Load sources: project
+`.arena-code/plugins/*.mjs`, user `~/.arena-code/plugins/`, and npm
+`arena-code-plugin-*`.
+
+```bash
+/plugins            # list loaded plugins
+```
+
+Built-in plugins: `git` (status/diff/log/commit/push + `/git`, `/commit`, `/push`),
+`snapshot` (`/snap`, `/rollback`), `linter` (`Lint`, `Format`), `testing`
+(`/test`, `/coverage`), `telemetry` (`/stats`), plus `docker`, `database`, `ci`, `web`.
+
+### Hooks / Events
+
+Plugins and skills subscribe to lifecycle events through a shared bus:
+`onSessionStart/End`, `onTurnStart/End`, `onToolBefore/After`, `onBridgeBefore/After`,
+`onMessageAdd`, `onContextPrune/Compact`, `onSkillStart/End`, `onError`,
+`onExternalChange`, `onSlashCommand`.
+
+### MCP
+
+Connect MCP servers (stdio transport) in `.arena-code/mcp.json`:
+
+```json
+{
+  "servers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-server-filesystem", "/path/to/project"],
+      "transport": "stdio"
+    }
+  }
+}
+```
+
+Their tools are converted to OpenAI function-calling and merged with the built-ins
+(see `src/mcp/`).
+
+---
+
 ## 🧪 Tests
 
 ```bash
-npm test        # 63 tests: tools + agent loop + streaming/backoff + sessions + UI + context + team
+npm test        # 107 tests: tools + agent loop + streaming/backoff + sessions + UI + context + team + hooks + skills + plugins + MCP + diff + theme/i18n + commands + subagents
 ```
 
 > The interactive TUI requires a real terminal (TTY) because ink uses raw keyboard input.

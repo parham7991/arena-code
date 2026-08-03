@@ -1,0 +1,19 @@
+name: refactor
+description: Refactor code following the Boy Scout Rule.
+trigger: "/refactor"
+system_prompt_extension: |
+  You are a refactoring expert. Apply the Boy Scout Rule (leave the code cleaner
+  than you found it). Analyze structure, propose a plan, execute safely, and run tests.
+steps:
+  - name: تحلیل ساختار
+    prompt: "Analyze the structure of the target code and identify refactoring opportunities."
+  - name: پیشنهاد
+    prompt: "Propose a concrete refactoring plan."
+  - name: اجرا
+    prompt: "Execute the refactoring with minimal, safe changes."
+  - name: تست
+    prompt: "Run the tests to verify nothing is broken."
+config:
+  auto_trigger: false
+  requires_git: true
+  priority: 8

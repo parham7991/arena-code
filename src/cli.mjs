@@ -20,6 +20,7 @@ import { getToolSchemas } from "./tools/registry.mjs";
 import { systemPromptWithMemoryNote, loadProjectMemory } from "./prompts/memory.mjs";
 import { manageContextAsync, compactMessagesWithLLM, messagesTokens, pruneToolMessages } from "./context.mjs";
 import { runTeam } from "./team.mjs";
+import { createRuntime } from "./runtime.mjs";
 import { ArenaApp } from "./ui/app.mjs";
 
 function printHelp() {
@@ -84,8 +85,9 @@ function parseArgs(argv) {
 }
 
 /** Build the shared engine that drives runAgent, persists, and manages context. */
-function createEngine({ bridge, store, sessionId, tools, ctx, maxTurns, initialMessages = [], systemPrompt }) {
+function createEngine({ bridge, store, sessionId, tools, ctx, maxTurns, initialMessages = [], systemPrompt, runtime }) {
   const state = { messages: [...initialMessages] };
+  const runSkillBound = runtime?.makeSkillRunner ? runtime.makeSkillRunner({ bridge, ctx, maxTurns }) : null;
   return {
     get sessionId() {
       return sessionId;
@@ -157,6 +159,18 @@ function createEngine({ bridge, store, sessionId, tools, ctx, maxTurns, initialM
       state.messages = messages;
       return store.dump(sessionId, messages);
     },
+    /** Run a skill by name with an optional task override. */
+    async runSkill(name, task = "") {
+      if (!runSkillBound) throw new Error("Skill runner not available");
+      return runSkillBound(name, task);
+    },
+    /** Run the team leader on a task. */
+    runTeam(task, { concurrency } = {}) {
+      return runTeam({ task, bridge, ctx, maxTurns, concurrency: concurrency || 3, systemPrompt });
+    },
+    get tools() {
+      return tools;
+    },
   };
 }
 
@@ -200,15 +214,16 @@ async function runTeamCli({ task, bridge, ctx, maxTurns, teamConcurrency, system
 }
 
 /** Launch the interactive ink TUI. */
-function runInteractive({ engine, sessionId, projectRoot, autonomy }) {
+function runInteractive({ engine, sessionId, projectRoot, autonomy, runtime, store, config }) {
   if (!process.stdin.isTTY) {
     console.error("✖ Interactive mode needs a terminal (TTY) for keyboard input.");
     console.error("  Use one-shot mode instead: arena-code -p \"your prompt\" --cwd <dir>");
     process.exitCode = 2;
     return;
   }
+  const cmdCtx = { engine, store, config, projectRoot, ctx: { projectRoot }, runTeam: (task) => engine.runTeam(task) };
   const instance = render(
-    h(ArenaApp, { engine, sessionId, projectRoot, autonomy }),
+    h(ArenaApp, { engine, sessionId, projectRoot, autonomy, runtime, cmdCtx }),
     { exitOnCtrlC: false }
   );
   const onSigint = () => {
@@ -227,11 +242,23 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) return printHelp();
 
-  const config = loadConfig({ ...process.env });
-  const bridgeUrl = args.url || config.bridgeUrl;
-  const bridgeKey = args.key || config.bridgeKey;
-  const maxTurns = Number.isInteger(args.maxTurns) ? args.maxTurns : config.maxTurns;
-  const autonomy = ["ask", "auto"].includes(args.autonomy) ? args.autonomy : config.autonomy;
+  // Build the runtime (config + i18n + theme + plugins + skills + commands + tools).
+  const runtime = await createRuntime({
+    env: { ...process.env, ARENA_CWD: args.cwd },
+    overrides: {
+      cwd: path.resolve(args.cwd),
+      ...(args.url ? { bridgeUrl: args.url } : {}),
+      ...(args.key ? { bridgeKey: args.key } : {}),
+      ...(Number.isInteger(args.maxTurns) ? { maxTurns: args.maxTurns } : {}),
+      ...(args.autonomy ? { autonomy: args.autonomy } : {}),
+      ...(Number.isInteger(args.teamConcurrency) ? { teamConcurrency: args.teamConcurrency } : {}),
+    },
+  });
+  const config = runtime.config;
+  const bridgeUrl = config.bridgeUrl;
+  const bridgeKey = config.bridgeKey;
+  const maxTurns = config.maxTurns;
+  const autonomy = config.autonomy;
 
   const projectRoot = path.resolve(args.cwd);
   const bridge = new BridgeClient({ url: bridgeUrl, apiKey: bridgeKey, timeoutMs: config.requestTimeoutMs });
@@ -284,9 +311,9 @@ async function main() {
     initialMessages[0].content = systemPrompt;
   }
 
-  const ctx = { cwd: projectRoot, projectRoot, autonomy };
-  const tools = getToolSchemas();
-  const engine = createEngine({ bridge, store, sessionId, tools, ctx, maxTurns, initialMessages, systemPrompt });
+  const ctx = { cwd: projectRoot, projectRoot, autonomy, pluginConfig: runtime.pluginConfig || {} };
+  const tools = runtime.tools;
+  const engine = createEngine({ bridge, store, sessionId, tools, ctx, maxTurns, initialMessages, systemPrompt, runtime });
   engine.memoryActive = memoryActive;
 
   // --- Team mode ---
@@ -296,14 +323,14 @@ async function main() {
       process.exitCode = 2;
       return;
     }
-    const teamConcurrency = Number.isInteger(args.teamConcurrency) ? args.teamConcurrency : config.teamConcurrency;
+    const teamConcurrency = config.teamConcurrency;
     return runTeamCli({ task: args.teamTask, bridge, ctx, maxTurns, teamConcurrency, systemPrompt, projectRoot });
   }
 
   // --- Interactive mode ---
   if (!args.prompt) {
-    console.log(`● Arena Code — bridge ${health.status === 200 ? "OK" : "UP"} · session ${sessionId}${memoryActive ? " · memory ✔" : ""}`);
-    return runInteractive({ engine, sessionId, projectRoot, autonomy });
+    console.log(`● Arena Code — bridge ${health.status === 200 ? "OK" : "UP"} · session ${sessionId}${memoryActive ? " · memory ✔" : ""}${runtime.plugins.length ? ` · plugins ${runtime.plugins.length}` : ""}`);
+    return runInteractive({ engine, sessionId, projectRoot, autonomy, runtime, store, config });
   }
 
   // --- One-shot mode ---

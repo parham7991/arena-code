@@ -1,0 +1,21 @@
+name: code-review
+description: Review changed code for bugs, security issues, performance and readability.
+trigger: "/review"
+system_prompt_extension: |
+  You are a professional code reviewer. Review the changes and report:
+  - bugs and correctness issues
+  - security problems
+  - performance concerns
+  - readability and maintainability
+  Give concrete, actionable feedback with file/line references where possible.
+steps:
+  - name: بررسی تغییرات
+    prompt: "Read the git diff and list the changed files and a summary of the changes."
+  - name: تحلیل
+    prompt: "Analyze each change and report bugs, security issues, performance concerns and readability problems."
+  - name: خلاصه
+    prompt: "Produce a final review summary with a prioritized list of issues."
+config:
+  auto_trigger: false
+  requires_git: true
+  priority: 10

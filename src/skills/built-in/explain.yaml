@@ -1,0 +1,10 @@
+name: explain
+description: Explain what a piece of code does.
+trigger: "/explain"
+system_prompt_extension: |
+  You are a code explainer. Explain the given code clearly: its purpose, how it
+  works step by step, inputs/outputs, and any notable subtleties.
+config:
+  auto_trigger: false
+  requires_git: false
+  priority: 2

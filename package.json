@@ -15,6 +15,16 @@
     "./agent": "./src/agent.mjs",
     "./session": "./src/session.mjs",
     "./config": "./src/config.mjs",
+    "./hooks": "./src/hooks.mjs",
+    "./skills": "./src/skills/skill-runner.mjs",
+    "./plugins": "./src/plugins/plugin-loader.mjs",
+    "./mcp": "./src/mcp/mcp-registry.mjs",
+    "./diff": "./src/diff.mjs",
+    "./subagent": "./src/subagent.mjs",
+    "./theme": "./src/theme.mjs",
+    "./i18n": "./src/i18n.mjs",
+    "./commands": "./src/commands/registry.mjs",
+    "./runtime": "./src/runtime.mjs",
     "./package.json": "./package.json"
   },
   "files": [
@@ -30,7 +40,7 @@
   "scripts": {
     "start": "node src/cli.mjs",
     "cli": "node src/cli.mjs",
-    "test": "node --test test/tools.test.mjs test/agent-loop.test.mjs test/bridge-stream.test.mjs test/session.test.mjs test/ui.test.mjs test/context.test.mjs test/team.test.mjs",
+    "test": "node --test test/tools.test.mjs test/agent-loop.test.mjs test/bridge-stream.test.mjs test/session.test.mjs test/ui.test.mjs test/context.test.mjs test/team.test.mjs test/hooks.test.mjs test/skills.test.mjs test/plugins.test.mjs test/diff.test.mjs test/theme-i18n.test.mjs test/commands.test.mjs test/mcp.test.mjs test/subagent.test.mjs",
     "mock-bridge": "node test/mock-bridge.mjs",
     "prepublishOnly": "npm test"
   },
@@ -58,6 +68,7 @@
   "dependencies": {
     "@inkjs/ui": "^2.0.0",
     "ink": "^6.8.0",
+    "js-yaml": "^5.2.3",
     "react": "^19.2.8"
   }
 }
