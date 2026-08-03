@@ -198,7 +198,11 @@ export function ArenaApp({
       exit();
       return;
     }
-    if (key.tab) toggleExpand();
+    // Tab: if typing a slash command, let the input autocomplete; otherwise expand.
+    if (key.tab) {
+      if (input.startsWith("/")) return; // handled by MultilineInput
+      toggleExpand();
+    }
   });
 
   return h(

@@ -79,10 +79,34 @@ export function loadConfig(env = {}, overrides = {}) {
   // 1. defaults
   const cfg = { ...DEFAULTS, dataDir };
 
-  // 2. env (ARENA_*)
+  // Auto-discover bridge key/url from the bridge's own .env (~/.arena-bridge/.env
+  // or $ARENA_CODE_DIR/../.arena-bridge/.env). This makes `arena` connect to the
+  // running bridge even if the shell wasn't sourced (no ARENA_BRIDGE_KEY env set).
+  function bridgeDotEnv() {
+    const candidates = [
+      path.join(os.homedir(), ".arena-bridge", ".env"),
+      path.join(dataDir, "..", ".arena-bridge", ".env"),
+      path.join(os.homedir(), ".arena-code", "arena-account-bridge", ".env"),
+    ];
+    for (const file of candidates) {
+      try {
+        if (fs.existsSync(file)) return fs.readFileSync(file, "utf8");
+      } catch { /* ignore */ }
+    }
+    return "";
+  }
+  const dotEnv = bridgeDotEnv();
+  const parseDot = (key) => {
+    const m = dotEnv.match(new RegExp(`^${key}=(.+)$`, "m"));
+    return m ? m[1].trim().replace(/^["']|["']$/g, "") : undefined;
+  };
+
+  // 2. env (ARENA_*) — with fallback to bridge .env auto-discovery
+  const dotPort = parseDot("PORT");
+  const autoBridgeUrl = dotPort ? `http://127.0.0.1:${dotPort}` : undefined;
   const envMap = {
-    bridgeUrl: env.ARENA_BRIDGE_URL,
-    bridgeKey: env.ARENA_BRIDGE_KEY,
+    bridgeUrl: env.ARENA_BRIDGE_URL || parseDot("ARENA_AGENT_BRIDGE_URL") || autoBridgeUrl,
+    bridgeKey: env.ARENA_BRIDGE_KEY || parseDot("ARENA_AGENT_BRIDGE_KEY"),
     maxTurns: env.ARENA_MAX_TURNS,
     autonomy: env.ARENA_AUTONOMY,
     teamConcurrency: env.ARENA_TEAM_CONCURRENCY,

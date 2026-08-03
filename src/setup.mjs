@@ -82,9 +82,9 @@ export async function runSetup({ env = process.env, overrides = {}, args = [] } 
   const theme = interactive ? ((await ask(`Choose a theme [${defaultTheme}]: `)) || defaultTheme) : defaultTheme;
   const validTheme = THEME_NAMES.includes(theme) ? theme : "default";
 
-  // 2. Language (optional)
-  console.log(`Languages: ${SUPPORTED.join(", ")}`);
-  const lang = interactive ? ((await ask(`Language [${prefs.lang || "en"}]: `)) || prefs.lang || "en") : prefs.lang || "en";
+  // 2. Language — not prompted (default to en / saved pref). Kept out of the
+  // wizard to keep first-run quick; changeable via /lang or config later.
+  const lang = prefs.lang || "en";
   const validLang = SUPPORTED.includes(lang) ? lang : "en";
 
   // 3. Email (forced if provided)

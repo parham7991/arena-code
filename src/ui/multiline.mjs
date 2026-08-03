@@ -18,13 +18,23 @@ export function MultilineInput({
   placeholder = "Type a message…",
   commands = [], // [{name, description}]
 }) {
+  // Keep the latest value/cursor in refs so rapid keystrokes (type/delete) always
+  // operate on the freshest state (avoids stale-closure backspace bugs).
+  const valueRef = useRef(value);
   const cursorRef = useRef(value.length);
-  const [cursor, setCursorState] = useState(value.length);
-  const [selIdx, setSelIdx] = useState(0);
+  const [, force] = useState(0);
+  const setValue = (v) => {
+    valueRef.current = v;
+    onChange?.(v);
+  };
   const setCursor = (n) => {
     cursorRef.current = n;
-    setCursorState(n);
+    force((x) => x + 1); // re-render for cursor display
   };
+  const selRef = useRef(0);
+
+  // Sync external value changes into the ref.
+  if (valueRef.current !== value) valueRef.current = value;
 
   // Compute matching slash-command suggestions when the input starts with "/".
   const isSlash = value.startsWith("/");
@@ -35,72 +45,71 @@ export function MultilineInput({
   const showSuggestions = isSlash && matches.length > 0 && !value.includes(" ");
 
   function applyCommand(name) {
-    onChange?.("/" + name + " ");
+    setValue("/" + name + " ");
     setCursor(("/" + name + " ").length);
-    setSelIdx(0);
+    selRef.current = 0;
   }
 
   useInput((input, key) => {
     if (!active) return;
     const cur = cursorRef.current;
-    if (key.ctrl && input.toLowerCase() === "u") {
-      onChange?.(""); setCursor(0); return;
+    const val = valueRef.current;
+
+    if (key.ctrl && (input || "").toLowerCase() === "u") {
+      setValue(""); setCursor(0); return;
     }
     // Tab autocompletes a slash command.
     if (key.tab && showSuggestions) {
-      applyCommand(matches[selIdx % matches.length].name);
+      applyCommand(matches[selRef.current % matches.length].name);
       return;
     }
     if (key.return && !key.shift) {
-      const text = value;
-      if (text.trim()) { onChange?.(""); setCursor(0); onSubmit?.(text); }
+      const text = val;
+      if (text.trim()) { setValue(""); setCursor(0); onSubmit?.(text); }
       return;
     }
     if (key.return && key.shift) {
-      onChange?.(value.slice(0, cur) + "\n" + value.slice(cur)); setCursor(cur + 1); return;
+      setValue(val.slice(0, cur) + "\n" + val.slice(cur)); setCursor(cur + 1); return;
     }
     if (key.backspace) {
-      if (cur > 0) { onChange?.(value.slice(0, cur - 1) + value.slice(cur)); setCursor(cur - 1); }
+      if (cur > 0) { setValue(val.slice(0, cur - 1) + val.slice(cur)); setCursor(cur - 1); }
       return;
     }
     if (key.delete) {
-      if (cur < value.length) onChange?.(value.slice(0, cur) + value.slice(cur + 1));
+      if (cur < val.length) setValue(val.slice(0, cur) + val.slice(cur + 1));
       return;
     }
     if (key.leftArrow) { setCursor(Math.max(0, cur - 1)); return; }
-    if (key.rightArrow) { setCursor(Math.min(value.length, cur + 1)); return; }
+    if (key.rightArrow) { setCursor(Math.min(val.length, cur + 1)); return; }
     if (key.home) { setCursor(0); return; }
-    if (key.end) { setCursor(value.length); return; }
+    if (key.end) { setCursor(val.length); return; }
     // Up/Down cycle command suggestions when typing /.
     if ((key.upArrow || key.downArrow) && showSuggestions) {
       const d = key.upArrow ? -1 : 1;
-      setSelIdx((i) => (i + d + matches.length) % matches.length);
+      selRef.current = (selRef.current + d + matches.length) % matches.length;
+      force((x) => x + 1);
       return;
     }
     if (key.upArrow || key.downArrow) return;
     if (input && input.length === 1) {
-      // reset suggestion selection on typing
-      setSelIdx(0);
-      onChange?.(value.slice(0, cur) + input + value.slice(cur));
+      selRef.current = 0;
+      setValue(val.slice(0, cur) + input + val.slice(cur));
       setCursor(cur + 1);
     }
   });
 
   const display = value || placeholder;
-  const lines = value.split("\n");
-  const cursorLine = value.slice(0, cursor).split("\n").length - 1;
 
   return h(
     Box,
     { flexDirection: "column" },
-    // command suggestion popup
     showSuggestions
       ? h(
           Box,
           { flexDirection: "column", marginBottom: 0 },
           matches.map((m, i) =>
-            h(Text, { key: m.name, color: i === selIdx % matches.length ? "cyan" : "gray", bold: i === selIdx % matches.length },
-              (i === selIdx % matches.length ? "❯ " : "  ") + "/" + m.name + (m.description ? "  " + m.description : ""))
+            h(Text, { key: m.name, color: i === selRef.current % matches.length ? "cyan" : "gray", bold: i === selRef.current % matches.length },
+              (i === selRef.current % matches.length ? "❯ " : "  ") + "/" + m.name + (m.description ? "  " + m.description : ""))
           )
         )
       : null,
@@ -108,9 +117,9 @@ export function MultilineInput({
       Box,
       { flexDirection: "row" },
       h(Text, { color: "magenta", bold: true }, prompt),
-      h(Text, { dimColor: !value }, value.slice(0, cursor)),
-      h(Text, { inverse: true }, cursor < value.length ? value[cursor] : " "),
-      h(Text, { dimColor: !value }, value.length > cursor ? value.slice(cursor + 1) : "")
+      h(Text, { dimColor: !value }, value.slice(0, cursorRef.current)),
+      h(Text, { inverse: true }, cursorRef.current < value.length ? value[cursorRef.current] : " "),
+      h(Text, { dimColor: !value }, value.length > cursorRef.current ? value.slice(cursorRef.current + 1) : "")
     )
   );
 }
