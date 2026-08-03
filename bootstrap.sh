@@ -121,7 +121,8 @@ if [[ -f "$HOME/.arena-bridge/credentials.json" ]]; then
   export PORT="$BRIDGE_PORT"
   [[ -f "$DATA_DIR/.env" ]] && export ARENA_AGENT_BRIDGE_KEY=$(grep "^ARENA_AGENT_BRIDGE_KEY=" "$DATA_DIR/.env" | cut -d= -f2)
   if (( HAS_WARP )); then export ARENA_AGENT_PROXY="socks5://127.0.0.1:$WARP_PORT"; fi
-  nohup node src/index.mjs > /tmp/arena-bridge.log 2>&1 &
+  nohup setsid node src/index.mjs > /tmp/arena-bridge.log 2>&1 < /dev/null &
+  disown 2>/dev/null || true
   sleep 6
   curl -s --max-time 5 "http://127.0.0.1:$BRIDGE_PORT/health" | grep -q '"ok":true' \
     && say "✔ Bridge running" || warn "Bridge not up — check /tmp/arena-bridge.log"
