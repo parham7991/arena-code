@@ -26,7 +26,16 @@ if [[ ! -d "$INSTALL_DIR/.git" ]]; then
   }
 else
   say "Updating arena-code (git pull)…"
-  (cd "$INSTALL_DIR" && git pull --ff-only 2>/dev/null || warn "Could not update; using existing copy.")
+  # Force-sync the working tree to the remote so stale/failed pulls never leave
+  # old install.sh / warp.sh behind. Falls back to re-cloning if fetch fails.
+  if ! (cd "$INSTALL_DIR" && git fetch --depth 1 origin 2>/dev/null && git reset --hard -q origin/main 2>/dev/null); then
+    warn "Could not update repo; forcing fresh clone…"
+    rm -rf "$INSTALL_DIR"
+    git clone --depth 1 "$ARENA_URL" "$INSTALL_DIR" 2>/dev/null || {
+      err "Clone failed. Check network / URL."
+      exit 1
+    }
+  fi
 fi
 
 cd "$INSTALL_DIR"
