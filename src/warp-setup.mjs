@@ -108,8 +108,10 @@ export async function startWarp(dataDir) {
   const cfg = path.join(dir, "wireproxy.conf");
   if (!fs.existsSync(cfg)) throw new Error("wireproxy.conf not found — run 'node src/warp-setup.mjs register' first");
   const wg = await hasBin("wireproxy");
-  const wgExe = path.join(dir, "wireproxy");
-  const exe = wg ? "wireproxy" : fs.existsSync(wgExe) ? wgExe : null;
+  const candidates = ["wireproxy", path.join(dir, "wireproxy"), path.join(dir, "wireproxy", "wireproxy")];
+  let exe = null;
+  if (wg) exe = "wireproxy";
+  else for (const c of candidates) if (fs.existsSync(c)) { exe = c; break; }
   if (!exe) throw new Error("wireproxy not installed — see warp.sh (auto-download)");
   return spawn(exe, ["-c", cfg], { stdio: "inherit" });
 }

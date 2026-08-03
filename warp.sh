@@ -36,14 +36,17 @@ if ! command -v wireproxy >/dev/null 2>&1 && [[ ! -f "$WARP_DIR/wireproxy" ]]; t
   OS=$(uname -s | tr '[:upper:]' '[:lower:]')
   ARCH=$(uname -m)
   case "$ARCH" in x86_64) ARCH="amd64";; aarch64|arm64) ARCH="arm64";; esac
-  URL="https://github.com/octeep/wireproxy/releases/latest/download/wireproxy-$OS-$ARCH.tar.gz"
+  # Correct asset name uses underscores, e.g. wireproxy_linux_amd64.tar.gz
+  URL="https://github.com/octeep/wireproxy/releases/latest/download/wireproxy_${OS}_${ARCH}.tar.gz"
   if curl -fsSL "$URL" -o "$WARP_DIR/wireproxy.tar.gz" 2>/dev/null; then
-    (cd "$WARP_DIR" && tar -xzf wireproxy.tar.gz 2>/dev/null || true)
+    (cd "$WARP_DIR" && tar -xzf wireproxy.tar.gz 2>/dev/null || tar -xzf wireproxy.tar.gz -C "$WARP_DIR" --strip-components=1 2>/dev/null || true)
+    # binary may be named 'wireproxy' or similar after extraction
     chmod +x "$WARP_DIR/wireproxy" 2>/dev/null || true
+    ls "$WARP_DIR" 2>/dev/null | head
     rm -f "$WARP_DIR/wireproxy.tar.gz"
     say "wireproxy downloaded."
   else
-    warn "Could not auto-download wireproxy. Install it manually (https://github.com/octeep/wireproxy)."
+    warn "Could not auto-download wireproxy. Install it manually: https://github.com/octeep/wireproxy"
   fi
 fi
 
