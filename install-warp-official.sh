@@ -31,6 +31,18 @@ if ! command -v warp-cli >/dev/null 2>&1; then
 fi
 say "✔ cloudflare-warp installed"
 
+# 2b. Ensure the warp-svc daemon is running (systemd, or background fallback for containers).
+if ! pgrep -f warp-svc >/dev/null 2>&1; then
+  say "Starting warp-svc daemon…"
+  systemctl enable --now warp-svc 2>/dev/null || systemctl start warp-svc 2>/dev/null || true
+  sleep 3
+  if ! pgrep -f warp-svc >/dev/null 2>&1; then
+    nohup warp-svc > /tmp/warp-svc.log 2>&1 &
+    sleep 4
+  fi
+fi
+pgrep -f warp-svc >/dev/null 2>&1 && say "✔ warp-svc daemon running" || err "warp-svc daemon did not start"
+
 # 3. Register + configure proxy mode + connect
 say "Registering WARP…"
 warp-cli --accept-tos registration new 2>&1 | tail -2 || true

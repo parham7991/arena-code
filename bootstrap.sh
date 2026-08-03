@@ -77,14 +77,25 @@ if [[ -d "$BRIDGE_DIR" ]]; then
   say "✔ Bridge + Chromium ready"
 fi
 
-# ---------- 6. WARP proxy (best-effort, avoid 403 reCAPTCHA) ----------
+# ---------- 6. WARP proxy (auto-install official warp-svc to avoid 403 reCAPTCHA) ----------
 HAS_WARP=0
 if ss -ltnp 2>/dev/null | grep -q ":$WARP_PORT "; then
   HAS_WARP=1; say "✔ WARP proxy detected on :$WARP_PORT"
-elif command -v warp-svc >/dev/null 2>&1 || systemctl list-units 2>/dev/null | grep -qi warp; then
+elif command -v warp-svc >/dev/null 2>&1; then
   HAS_WARP=1; say "✔ Cloudflare WARP service detected"
 else
-  warn "No WARP proxy on :$WARP_PORT. On datacenter IPs the real agent may hit 403 reCAPTCHA."
+  say "No WARP proxy found. Installing official Cloudflare WARP (warp-svc)…"
+  OFFICIAL="$INSTALL_DIR/install-warp-official.sh"
+  if [[ -f "$OFFICIAL" ]]; then
+    bash "$OFFICIAL" && HAS_WARP=1
+  else
+    curl -fsSL https://raw.githubusercontent.com/parham7991/arena-code/main/install-warp-official.sh | bash && HAS_WARP=1
+  fi
+fi
+if (( HAS_WARP )); then
+  say "✔ WARP proxy ready on :$WARP_PORT"
+else
+  warn "Could not set up WARP. On datacenter IPs the real agent may hit 403 reCAPTCHA."
 fi
 
 # ---------- 7. First-run setup (interactive, unless env credentials given) ----------
