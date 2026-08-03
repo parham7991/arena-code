@@ -360,7 +360,9 @@ async function main() {
   }
 
   // --- One-shot mode ---
-  const stream = args.stream ?? true;
+  // Default to non-streaming for reliability: the real bridge/agent can be slow
+  // over streaming, and non-stream reliably returns tool_calls + results.
+  const stream = args.stream ?? false;
   console.log(`● Arena Code — bridge ${health.status === 200 ? "OK" : "UP"} · cwd ${projectRoot}`);
   console.log(`  session=${sessionId} · maxTurns=${maxTurns} · autonomy=${autonomy} · stream=${stream} · tools=${tools.length}${memoryActive ? " · ARENA_CODE.md ✔" : ""}\n`);
 
