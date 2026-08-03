@@ -261,7 +261,7 @@ async function main() {
 
   // First-run setup wizard / login (works even without a running bridge).
   if (args.setup) {
-    const result = await runSetup({ env: process.env });
+    const result = await runSetup({ env: process.env, args: process.argv.slice(2) });
     process.exitCode = result.configured ? 0 : 1;
     return;
   }

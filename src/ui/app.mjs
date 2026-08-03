@@ -223,7 +223,7 @@ export function ArenaApp({
       streamingRef.current ? h(Text, { dimColor: true, wrap: "wrap" }, streamingRef.current) : null
     ),
     h(Text, null),
-    h(MultilineInput, { value: input, onChange: setInput, onSubmit: submit, active: !running, prompt: t("ui.prompt") }),
+    h(MultilineInput, { value: input, onChange: setInput, onSubmit: submit, active: !running, prompt: t("ui.prompt"), commands: commandRegistry ? commandRegistry.all().map((c) => ({ name: c.name, description: c.description })) : [] }),
     h(Text, { dimColor: true }, running ? t("ui.stop") + " · " + t("ui.expand") : t("ui.send") + " · " + t("ui.newline") + " · /help")
   );
 }

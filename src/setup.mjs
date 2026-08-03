@@ -57,11 +57,15 @@ async function loginViaBridge({ email, password, bridgeUrl, dataDir }) {
 
 /**
  * Run the interactive setup wizard.
+ * Accepts optional overrides: { email, password } to skip prompts (non-interactive).
  * Returns { configured, email, bridgeUrl }.
  */
-export async function runSetup({ env = process.env, overrides = {} } = {}) {
+export async function runSetup({ env = process.env, overrides = {}, args = [] } = {}) {
   const config = loadConfig(env, overrides);
   const dataDir = config.dataDir;
+  const getArg = (flag) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
+  const forcedEmail = getArg("--email") || env.ARENA_EMAIL;
+  const forcedPassword = getArg("--password") || env.ARENA_PASSWORD;
 
   console.log("");
   console.log("╭────────────────────────────────────────────╮");
@@ -69,29 +73,31 @@ export async function runSetup({ env = process.env, overrides = {} } = {}) {
   console.log("╰────────────────────────────────────────────╯");
   console.log("");
 
+  const interactive = !forcedEmail && !forcedPassword;
+
   // 1. Theme
   const prefs = loadUserPrefs(dataDir);
   const defaultTheme = prefs.theme || config.theme || "default";
   console.log(`Theme options: ${THEME_NAMES.join(", ")}`);
-  const theme = (await ask(`Choose a theme [${defaultTheme}]: `)) || defaultTheme;
+  const theme = interactive ? ((await ask(`Choose a theme [${defaultTheme}]: `)) || defaultTheme) : defaultTheme;
   const validTheme = THEME_NAMES.includes(theme) ? theme : "default";
 
   // 2. Language (optional)
   console.log(`Languages: ${SUPPORTED.join(", ")}`);
-  const lang = (await ask(`Language [${prefs.lang || "en"}]: `)) || prefs.lang || "en";
+  const lang = interactive ? ((await ask(`Language [${prefs.lang || "en"}]: `)) || prefs.lang || "en") : prefs.lang || "en";
   const validLang = SUPPORTED.includes(lang) ? lang : "en";
 
-  // 3. Email
+  // 3. Email (forced if provided)
   const savedCreds = hasCredentials(dataDir) ? await import("./auth.mjs").then((m) => m.loadCredentials(dataDir)) : null;
   const defaultEmail = savedCreds?.email || "";
-  const email = (await ask(`Arena email${defaultEmail ? ` [${defaultEmail}]` : ""}: `)) || defaultEmail;
+  const email = forcedEmail || (await ask(`Arena email${defaultEmail ? ` [${defaultEmail}]` : ""}: `)) || defaultEmail;
   if (!email) {
     console.log("✖ Email is required. Run 'arena setup' again.");
     return { configured: false, email: "" };
   }
 
-  // 4. Password (only if not saved or user wants to change)
-  let password = savedCreds?.email === email ? savedCreds.password : "";
+  // 4. Password (forced if provided, else saved, else prompt)
+  let password = forcedPassword || (savedCreds?.email === email ? savedCreds.password : "");
   if (!password) {
     password = await ask("Arena password (stored encrypted): ", { silent: true });
     if (!password) {

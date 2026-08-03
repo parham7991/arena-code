@@ -53,6 +53,16 @@ test("MultilineInput renders prompt and current value", () => {
   assert.match(out, /hello world/);
 });
 
+test("MultilineInput shows slash-command suggestions when typing /", () => {
+  const commands = [
+    { name: "help", description: "Show help" },
+    { name: "compact", description: "Compress context" },
+    { name: "clear", description: "Clear" },
+  ];
+  const out = renderToString(h(MultilineInput, { value: "/he", onChange: () => {}, commands, onSubmit: () => {} }));
+  assert.match(out, /\/help/);
+});
+
 test("ArenaApp renders the header with session/project/autonomy", () => {
   const out = renderToString(h(ArenaApp, { engine: engineStub, sessionId: "s-abc", projectRoot: "/tmp/x", autonomy: "auto" }));
   assert.match(out, /Arena Code/);
