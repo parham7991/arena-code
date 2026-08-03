@@ -38,7 +38,19 @@ if ss -ltnp 2>/dev/null | grep -q ":$PORT "; then
   HAS_OFFICIAL=1; say "✔ A proxy is already listening on 127.0.0.1:$PORT"
 fi
 
-# Download wireproxy only if no official WARP service is present.
+# If no official WARP is running, install the official cloudflare-warp client
+# (warp-svc) which provides a reliable SOCKS5 proxy that Chromium can use.
+if (( ! HAS_OFFICIAL )); then
+  say "Installing official Cloudflare WARP (warp-svc)…"
+  OFFICIAL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/install-warp-official.sh"
+  if [[ -f "$OFFICIAL" ]]; then
+    bash "$OFFICIAL" && HAS_OFFICIAL=1
+  else
+    curl -fsSL https://raw.githubusercontent.com/parham7991/arena-code/main/install-warp-official.sh | bash && HAS_OFFICIAL=1
+  fi
+fi
+
+# Download wireproxy only if official WARP still unavailable.
 if (( ! HAS_OFFICIAL )); then
   if ! command -v wireproxy >/dev/null 2>&1 && [[ ! -f "$WARP_DIR/wireproxy" ]]; then
     say "Downloading wireproxy…"
@@ -62,14 +74,32 @@ fi
 
 case "$CMD" in
   register)
-    ARENA_CODE_DIR="$ARENA_DIR" node "$SCRIPT" register "$@"
+    if (( HAS_OFFICIAL )); then
+      warp-cli --accept-tos registration new 2>&1 | tail -2 || true
+      warp-cli --accept-tos mode proxy 2>&1 | tail -2 || true
+      warp-cli --accept-tos connect 2>&1 | tail -2 || true
+    else
+      ARENA_CODE_DIR="$ARENA_DIR" node "$SCRIPT" register "$@"
+    fi
     ;;
   start)
-    ARENA_CODE_DIR="$ARENA_DIR" node "$SCRIPT" start
+    if (( HAS_OFFICIAL )); then
+      warp-cli --accept-tos connect 2>&1 | tail -2 || true
+      say "WARP (official) connected."
+    else
+      ARENA_CODE_DIR="$ARENA_DIR" node "$SCRIPT" start
+    fi
     ;;
   all)
-    ARENA_CODE_DIR="$ARENA_DIR" node "$SCRIPT" register || warn "Registration failed (network?)."
-    ARENA_CODE_DIR="$ARENA_DIR" node "$SCRIPT" start
+    if (( HAS_OFFICIAL )); then
+      warp-cli --accept-tos registration new 2>&1 | tail -1 || true
+      warp-cli --accept-tos mode proxy 2>&1 | tail -1 || true
+      warp-cli --accept-tos connect 2>&1 | tail -1 || true
+      sleep 2
+    else
+      ARENA_CODE_DIR="$ARENA_DIR" node "$SCRIPT" register || warn "Registration failed (network?)."
+      ARENA_CODE_DIR="$ARENA_DIR" node "$SCRIPT" start
+    fi
     ;;
 esac
 
