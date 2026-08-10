@@ -6,6 +6,7 @@ import { SYSTEM_PROMPT } from "./prompts/sys.mjs";
 import { hookBus } from "./hooks.mjs";
 import { prepareForArena, reassembleInstruction } from "./chunker.mjs";
 import { LIMITS } from "./limits.mjs";
+import { healIfNeeded } from "./healing.mjs";
 
 /**
  * Accumulate a streamed SSE chunk into a running assistant-message accumulator.
@@ -153,6 +154,25 @@ export async function runAgent({
         name: name || "",
         content: toolContent,
       });
+
+      // Stage 3: Self-Healing — after Write/Edit, auto-run Diagnostics + Test
+      // If failed, append healing hint as extra tool message so model fixes in next turn
+      if (["Write", "Edit"].includes(name)) {
+        try {
+          const heal = await healIfNeeded(name, args, ctx);
+          if (heal && !heal.passed) {
+            msgs.push({
+              role: "tool",
+              tool_call_id: `${callId}_heal`,
+              name: "Diagnostics",
+              content: heal.hint,
+            });
+            onToolResult?.({ id: `${callId}_heal`, name: "Diagnostics", result: heal });
+          }
+        } catch (e) {
+          // healing failure should not break loop
+        }
+      }
     }
     onSave?.(msgs);
     hookBus.notify("onTurnEnd", { turn: turn + 1, result: { status: "tools", messages: msgs }, ctx }).catch(() => {});
