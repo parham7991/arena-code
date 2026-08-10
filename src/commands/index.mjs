@@ -100,5 +100,34 @@ export function builtinCommands() {
     { name: "debug", description: "Run the debug skill.", handler: async (_a, ctx) => (typeof ctx?.engine?.runSkill === "function" ? (await ctx.engine.runSkill("debug")).content : { error: "Unavailable" }) },
     { name: "team", description: "Run the team leader on the given task.", handler: async (args, ctx) => (args?.[0] && ctx?.runTeam ? await ctx.runTeam(args.join(" ")) : { error: "Usage: /team <task>" }) },
     { name: "git", description: "Show git status.", handler: async (_a, ctx) => (await import("../plugins/built-in/git.mjs")).then((m) => m.default.commands.find((c) => c.name === "git").handler([], ctx?.ctx || {}).then((r) => `git:\n${r.stdout || r.error || ""}`)) },
+    {
+      name: "mcp",
+      description: "MCP: /mcp, /mcp connect <intent>, /mcp health",
+      handler: async (args, ctx) => {
+        const sub = args?.[0] || "list";
+        const projectRoot = ctx?.projectRoot || process.cwd();
+        const { connectMcp, listMcp, healthCheck, listCatalog } = await import("../mcp/mcp-agent.mjs");
+        if (sub === "catalog") {
+          const list = listCatalog();
+          return `Catalog (${list.length}):\n` + list.map(c=> `  ${c.name} — ${c.description}`).join("\n");
+        }
+        if (sub === "list") {
+          const list = await listMcp(projectRoot);
+          if (!list.length) return "No MCPs. Try: /mcp connect postgres";
+          return list.map(s=> `  ${s.name} (${s.type})`).join("\n");
+        }
+        if (sub === "health") {
+          const res = await healthCheck(projectRoot);
+          return res.map(r=> `  ${r.name} ${r.ok?"●":"○"} ${r.hint}`).join("\n");
+        }
+        if (sub === "connect") {
+          const intent = args.slice(1).join(" ");
+          if (!intent) return "Usage: /mcp connect <intent>  e.g., /mcp connect postgres localhost";
+          const r = await connectMcp(intent, projectRoot);
+          return r.ok ? `✔ Connected ● ${r.name} — ${r.description}\n  → ${r.configPath}` : `✖ ${r.error}`;
+        }
+        return "MCP: /mcp list | /mcp health | /mcp connect <intent> | /mcp catalog";
+      },
+    },
   ];
 }

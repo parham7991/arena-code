@@ -40,6 +40,7 @@ import { runSelfTest, formatReport } from "./selftest.mjs";
 import { runSetup } from "./setup.mjs";
 import { hasCredentials, loadCredentials } from "./auth.mjs";
 import { ArenaApp } from "./ui/app.mjs";
+import { connectMcp, listMcp, healthCheck, listCatalog, searchCatalog } from "./mcp/mcp-agent.mjs";
 
 function printHelp() {
   console.log(`Arena Code — terminal coding agent (M6)
@@ -49,9 +50,17 @@ USAGE:
   arena-code -p <prompt> [opts]  One-shot task.
   arena-code "<prompt>" [opts]   One-shot task.
   arena-code team "<task>"       Break a task into sub-tasks and run them as a team.
+  arena-code mcp <cmd>           MCP: connect/list/health/catalog
   arena-code --sessions          List this project's saved sessions.
   arena-code --selftest          Run an offline self-check (mock bridge).
   arena-code setup               First-run wizard (theme + email + password, saved securely).
+
+MCP:
+  arena mcp connect "<intent>"   Natural language connect (e.g., "postgres localhost")
+  arena mcp list                 List configured MCP servers
+  arena mcp health               Health check all MCP servers
+  arena mcp catalog              List available MCP servers (20)
+  arena mcp add <name> -- <cmd>  Add custom MCP (advanced)
 
 OPTIONS:
   -p, --prompt <text>    The task for the agent.
@@ -262,6 +271,70 @@ function runInteractive({ engine, sessionId, projectRoot, autonomy, runtime, sto
 }
 
 async function main() {
+  const rawArgs = process.argv.slice(2);
+  // MCP easy connect — handle before normal parse (mcp is a top-level command)
+  if (rawArgs[0] === "mcp") {
+    const sub = rawArgs[1];
+    const cwd = rawArgs.includes("--cwd") ? rawArgs[rawArgs.indexOf("--cwd")+1] : rawArgs.includes("-c") ? rawArgs[rawArgs.indexOf("-c")+1] : process.cwd();
+    const projectRoot = path.resolve(cwd);
+    if (!sub || sub === "help" || sub === "-h" || sub === "--help") {
+      console.log(`Arena MCP — easy connect\n\n  arena mcp connect "<intent>"   Natural language (e.g., "postgres localhost", "notion")\n  arena mcp list                 List configured servers\n  arena mcp health               Health check\n  arena mcp catalog              List 20 available servers\n  arena mcp add <name> -- <cmd>  Advanced custom\n\nExamples:\n  arena mcp connect "postgres localhost"\n  arena mcp connect "notion"\n  arena mcp connect --auto       // github + context7 auto\n`);
+      return;
+    }
+    if (sub === "catalog") {
+      const list = listCatalog();
+      console.log(`Catalog (${list.length}):`);
+      list.forEach(c=> console.log(`  ${c.name.padEnd(18)} ${c.description} [${c.keywords.join(", ")}]`));
+      return;
+    }
+    if (sub === "list") {
+      const { listMcp } = await import("./mcp/mcp-agent.mjs");
+      const list = await listMcp(projectRoot);
+      if (!list.length) { console.log("No MCPs configured. Try: arena mcp connect \"postgres\""); return; }
+      console.log(`MCPs in ${projectRoot}/.arena-code/mcp.json:`);
+      list.forEach(s=> console.log(`  ${s.name.padEnd(16)} ${s.type.padEnd(6)} ${s.spec.command ? s.spec.command + " " + (s.spec.args||[]).join(" ") : s.spec.url}`));
+      return;
+    }
+    if (sub === "health") {
+      const { healthCheck } = await import("./mcp/mcp-agent.mjs");
+      const res = await healthCheck(projectRoot);
+      console.log("MCP health:");
+      res.forEach(r=> console.log(`  ${r.name.padEnd(16)} ${r.ok ? "●" : "○"} ${r.hint} ${r.type||""}`));
+      return;
+    }
+    if (sub === "connect") {
+      const intent = rawArgs.slice(2).join(" ").replace(/^--auto$/, "github context7");
+      const actualIntent = intent.includes("--auto") ? "github" : intent;
+      // Handle --auto as two connects
+      if (rawArgs.includes("--auto")) {
+        for (const autoIntent of ["github", "context7"]) {
+          const r = await connectMcp(autoIntent, projectRoot);
+          console.log(r.ok ? `✔ ${r.name} → ${r.configPath}` : `✖ ${r.error}`);
+        }
+        return;
+      }
+      if (!intent || intent.startsWith("-")) { console.log("Usage: arena mcp connect \"<intent>\"  e.g., arena mcp connect \"postgres localhost\""); return; }
+      const r = await connectMcp(intent, projectRoot);
+      if (r.ok) {
+        console.log(`✔ Connected ● ${r.name} — ${r.description}`);
+        console.log(`  → ${r.configPath}`);
+        if (r.spec.command) console.log(`  command: ${r.spec.command} ${(r.spec.args||[]).join(" ")}`);
+        if (r.spec.url) console.log(`  url: ${r.spec.url}`);
+        console.log(`  Run: arena mcp health`);
+      } else {
+        console.log(`✖ ${r.error}`);
+        const hits = searchCatalog(intent);
+        if (hits.length) console.log(`  Did you mean: ${hits.slice(0,3).map(h=>h.name).join(", ")}?`);
+      }
+      return;
+    }
+    if (sub === "add") {
+      console.log("Advanced: use arena mcp connect \"<intent>\" for easy, or manually edit .arena-code/mcp.json");
+      return;
+    }
+    console.log(`Unknown mcp subcommand: ${sub}. Try: arena mcp --help`);
+    return;
+  }
   const args = parseArgs(process.argv.slice(2));
   if (args.help) return printHelp();
 
