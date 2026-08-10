@@ -1,6 +1,6 @@
 {
   "name": "arena-code",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Arena Code — a Claude Code / Codex / OpenCode-style terminal coding agent that drives the local arena-account-bridge and executes tools on your local files.",
   "type": "module",
   "bin": {
