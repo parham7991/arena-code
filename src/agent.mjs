@@ -107,8 +107,20 @@ export async function runAgent({
 
     const toolCalls = Array.isArray(assistant.tool_calls) ? assistant.tool_calls : [];
 
+    // FLAWLESS FIX: If model printed <tool> blocks as plain text (common with 5 tasks in 1 prompt),
+    // but tool_calls is empty, parse them ourselves — never error, never ignore.
+    let effectiveToolCalls = toolCalls;
+    if (effectiveToolCalls.length === 0 && typeof assistant.content === "string" && assistant.content.includes("<tool>")) {
+      const parsed = parseToolBlocks(assistant.content);
+      if (parsed.length > 0) {
+        effectiveToolCalls = parsed;
+        // Clean content to keep only text outside tool blocks
+        assistant.content = assistant.content.replace(/<tool>[\s\S]*?<\/tool>/g, "").trim();
+      }
+    }
+
     // b. Final answer.
-    if (finishReason === "stop" || toolCalls.length === 0) {
+    if (finishReason === "stop" || effectiveToolCalls.length === 0) {
       const content = typeof assistant.content === "string" ? assistant.content : "";
       onContent?.(content, finishReason);
       msgs.push({ role: "assistant", content });
@@ -120,7 +132,7 @@ export async function runAgent({
     // c. The model wants tools: record its message, then execute each call.
     msgs.push(assistant);
 
-    for (const call of toolCalls) {
+    for (const call of effectiveToolCalls) {
       const name = call?.function?.name;
       let args = {};
       try {
@@ -183,6 +195,30 @@ export async function runAgent({
   onContent?.(warning, "max_turns");
   onSave?.(msgs);
   return { status: "max_turns", content: warning, turns: maxTurns, messages: msgs };
+}
+
+/**
+ * Parse <tool>{"name":...,"arguments":...}</tool> blocks from plain text content.
+ * Fallback for when bridge didn't convert them to tool_calls (e.g., 5 tasks in 1 prompt).
+ */
+export function parseToolBlocks(content) {
+  const out = [];
+  const re = /<tool>\s*(\{[\s\S]*?\})\s*<\/tool>/g;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    try {
+      const obj = JSON.parse(m[1]);
+      if (obj && typeof obj.name === "string") {
+        const args = obj.arguments ?? obj.args ?? {};
+        out.push({
+          id: `tc_fallback_${out.length}_${Math.random().toString(36).slice(2, 6)}`,
+          type: "function",
+          function: { name: obj.name, arguments: typeof args === "string" ? args : JSON.stringify(args) },
+        });
+      }
+    } catch {}
+  }
+  return out;
 }
 
 /**
