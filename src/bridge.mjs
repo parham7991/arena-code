@@ -7,6 +7,8 @@
 //   - session header: x-codex-session-id support
 //   - timeout: 120s default per request
 
+import { LIMITS } from "./limits.mjs";
+
 const DEFAULT_TIMEOUT_MS = 120_000;
 const RETRY_STATUSES = [429, 503];
 const DEFAULT_MAX_RETRIES = 3;
@@ -156,6 +158,14 @@ export class BridgeClient {
     if (max_tokens !== undefined) body.max_tokens = max_tokens;
     if (temperature !== undefined) body.temperature = temperature;
 
+    // Precise pre-check: 5MB body limit (from arena-account-bridge server.mjs)
+    const bodyStr = JSON.stringify(body);
+    if (Buffer.byteLength(bodyStr, "utf8") > LIMITS.REQUEST_BODY_MAX) {
+      const err = new Error(`Request body ${Buffer.byteLength(bodyStr, "utf8")} bytes > ${LIMITS.REQUEST_BODY_MAX} (precise limit). Chunk messages to ${LIMITS.MESSAGE_SAFE} chars per part.`);
+      err.status = 413;
+      throw err;
+    }
+
     const res = await this._requestWithRetry(body, sessionId);
     return res.json();
   }
@@ -168,6 +178,13 @@ export class BridgeClient {
     const body = { model, messages, tools, stream: true };
     if (max_tokens !== undefined) body.max_tokens = max_tokens;
     if (temperature !== undefined) body.temperature = temperature;
+
+    const bodyStr = JSON.stringify(body);
+    if (Buffer.byteLength(bodyStr, "utf8") > LIMITS.REQUEST_BODY_MAX) {
+      const err = new Error(`Stream body ${Buffer.byteLength(bodyStr, "utf8")} bytes > ${LIMITS.REQUEST_BODY_MAX}. Chunk first.`);
+      err.status = 413;
+      throw err;
+    }
 
     const res = await this._requestWithRetry(body, sessionId);
     yield* readSSEStream(res.body);

@@ -4,6 +4,8 @@
 import { runTool } from "./tools/registry.mjs";
 import { SYSTEM_PROMPT } from "./prompts/sys.mjs";
 import { hookBus } from "./hooks.mjs";
+import { prepareForArena, reassembleInstruction } from "./chunker.mjs";
+import { LIMITS } from "./limits.mjs";
 
 /**
  * Accumulate a streamed SSE chunk into a running assistant-message accumulator.
@@ -85,13 +87,15 @@ export async function runAgent({
     onTurn?.(turn + 1, msgs.length);
     hookBus.notify("onTurnStart", { turn: turn + 1, messages: msgs, ctx }).catch(() => {});
 
-    // a. Ask the model.
+    // a. Ask the model — auto-chunk if any message exceeds MESSAGE_SAFE (20k)
+    // This prevents format.mjs compact truncation (24k hard) and 5MB body limit.
+    const safeMsgs = chunkMessagesIfNeeded(msgs);
     let finishReason;
     let assistant;
     if (stream && typeof bridgeClient.chatStream === "function") {
-      ({ finishReason, assistant } = await streamTurn({ bridgeClient, messages: msgs, tools: toolDefs, sessionId, onChunk }));
+      ({ finishReason, assistant } = await streamTurn({ bridgeClient, messages: safeMsgs, tools: toolDefs, sessionId, onChunk }));
     } else {
-      const resp = await bridgeClient.chat({ messages: msgs, tools: toolDefs, sessionId });
+      const resp = await bridgeClient.chat({ messages: safeMsgs, tools: toolDefs, sessionId });
       const choice = resp?.choices?.[0];
       if (!choice) {
         throw new Error(resp?.error?.message || "Bridge returned no choices.");
@@ -133,11 +137,21 @@ export async function runAgent({
       const effectiveResult = afterData?.result !== undefined ? afterData.result : result;
       onToolResult?.({ id: callId, name, result: effectiveResult });
 
+      let toolContent = typeof effectiveResult === "string" ? effectiveResult : JSON.stringify(effectiveResult);
+      // Auto-handle truncated outputs (Bash 50k, etc.) — precise, no guessing
+      if (toolContent.includes("[truncated]") || toolContent.includes("…[truncated]")) {
+        toolContent += `\n\n[SYSTEM HINT: Output was truncated at ${LIMITS.BASH_OUTPUT_MAX} chars (precise limit from bash.mjs). To get remaining output: use Read with offset/limit or Bash with " | tail -n 200" or " | head -c 40000".]`;
+      }
+      // Auto-handle oversized tool result for next turn (will be chunked on next iteration)
+      if (toolContent.length > LIMITS.MESSAGE_SAFE) {
+        toolContent += `\n\n[SYSTEM HINT: This tool result is ${toolContent.length} chars > ${LIMITS.MESSAGE_SAFE} safe limit. Next turn will auto-chunk into ${Math.ceil(toolContent.length / LIMITS.MESSAGE_SAFE)} parts with [[PART]] headers — reassemble before using.]`;
+      }
+
       msgs.push({
         role: "tool",
         tool_call_id: callId,
         name: name || "",
-        content: typeof effectiveResult === "string" ? effectiveResult : JSON.stringify(effectiveResult),
+        content: toolContent,
       });
     }
     onSave?.(msgs);
@@ -149,6 +163,49 @@ export async function runAgent({
   onContent?.(warning, "max_turns");
   onSave?.(msgs);
   return { status: "max_turns", content: warning, turns: maxTurns, messages: msgs };
+}
+
+/**
+ * Chunk oversized messages for Arena web limits (precise: 20k safe, 24k hard).
+ * If a message content > MESSAGE_SAFE, split into PART-wrapped chunks.
+ * Tool messages keep tool_call_id, assistant messages keep tool_calls.
+ */
+export function chunkMessagesIfNeeded(messages) {
+  const out = [];
+  for (const m of messages) {
+    const content = typeof m.content === "string" ? m.content : (m.content == null ? "" : JSON.stringify(m.content));
+    if (content.length <= LIMITS.MESSAGE_SAFE) {
+      out.push(m);
+      continue;
+    }
+    // Oversized — chunk it
+    const parts = prepareForArena(content, LIMITS.MESSAGE_SAFE);
+    if (m.role === "tool") {
+      // Tool result: split into multiple tool messages with same id + part suffix
+      for (const p of parts) {
+        out.push({
+          role: "tool",
+          tool_call_id: `${m.tool_call_id}_part${p.index}/${p.total}`,
+          name: m.name || "tool",
+          content: p.wrapped,
+        });
+      }
+      // Final reassemble instruction as tool message
+      out.push({
+        role: "tool",
+        tool_call_id: `${m.tool_call_id}_reassemble`,
+        name: m.name || "tool",
+        content: reassembleInstruction(parts.length),
+      });
+    } else {
+      // User/assistant/system: split into sequential messages
+      for (const p of parts) {
+        out.push({ ...m, content: p.wrapped });
+      }
+      out.push({ role: "user", content: reassembleInstruction(parts.length) });
+    }
+  }
+  return out;
 }
 
 /** Stream one turn, accumulating deltas and invoking onChunk per content piece. */
