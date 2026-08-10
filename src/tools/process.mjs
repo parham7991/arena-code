@@ -43,14 +43,19 @@ export const processTool = {
     }
 
     if (action === "list") {
-      const list = [...processes.entries()].map(([id, p]) => ({
-        id,
-        command: p.command,
-        cwd: p.cwd,
-        running: !p.proc.killed && p.proc.exitCode === null,
-        uptimeSec: Math.floor((Date.now() - p.startTime) / 1000),
-        logChars: p.logs.length,
-      }));
+      const list = [...processes.entries()].map(([id, p]) => {
+        let running = false;
+        try { process.kill(-p.proc.pid, 0); running = true; } catch { running = !p.proc.killed && p.proc.exitCode === null; }
+        return {
+          id,
+          command: p.command,
+          cwd: p.cwd,
+          pid: p.proc.pid,
+          running,
+          uptimeSec: Math.floor((Date.now() - p.startTime) / 1000),
+          logChars: p.logs.length,
+        };
+      });
       return { ok: true, processes: list };
     }
 
@@ -62,35 +67,43 @@ export const processTool = {
         try { cwd = resolvePath(args.cwd, ctx); } catch { return { error: `invalid cwd '${args.cwd}'` }; }
       }
       const id = makeId();
-      const proc = spawn(command, { shell: true, cwd, detached: false });
-      let logs = "";
-      proc.stdout?.on("data", (d) => { logs += d.toString(); });
-      proc.stderr?.on("data", (d) => { logs += d.toString(); });
-      processes.set(id, { proc, logs: "", command, cwd, startTime: Date.now() });
-      // Update logs reference
-      const entry = processes.get(id);
+      // Use detached:true so we can kill the whole process group (shell + child)
+      const proc = spawn(command, { shell: true, cwd, detached: true, stdio: ["ignore", "pipe", "pipe"] });
+      proc.unref();
+      const entry = { proc, logs: "", command, cwd, startTime: Date.now() };
+      processes.set(id, entry);
       proc.stdout?.on("data", (d) => { entry.logs += d.toString(); });
       proc.stderr?.on("data", (d) => { entry.logs += d.toString(); });
       proc.on("exit", () => { /* keep logs */ });
+      proc.on("error", () => {});
 
       const waitMs = Number.isFinite(Number(args.timeout)) ? Number(args.timeout) : 3000;
       await new Promise((r) => setTimeout(r, waitMs));
-      const running = !proc.killed && proc.exitCode === null;
+      // Robust running check: try to signal the group, not just proc.exitCode (shell may have exited)
+      let running = false;
+      try {
+        process.kill(-proc.pid, 0);
+        running = true;
+      } catch {
+        running = !proc.killed && proc.exitCode === null;
+      }
       return {
         ok: true,
         id,
         running,
         cwd,
         command,
+        pid: proc.pid,
         logs: truncateLogs(entry.logs.slice(-8000)),
-        hint: running ? `Process ${id} running. Use Process logs/stop.` : `Process exited with code ${proc.exitCode}`,
+        hint: running ? `Process ${id} running (pid ${proc.pid}). Use Process logs/stop.` : `Process exited with code ${proc.exitCode}`,
       };
     }
 
     if (action === "logs") {
       const entry = processes.get(args.id);
       if (!entry) return { error: `Process ${args.id} not found` };
-      const running = !entry.proc.killed && entry.proc.exitCode === null;
+      let running = false;
+      try { process.kill(-entry.proc.pid, 0); running = true; } catch { running = !entry.proc.killed && entry.proc.exitCode === null; }
       return {
         ok: true,
         id: args.id,
@@ -103,10 +116,17 @@ export const processTool = {
     if (action === "stop") {
       const entry = processes.get(args.id);
       if (!entry) return { error: `Process ${args.id} not found` };
+      // Try to kill the whole process group (detached shell + children)
+      try { process.kill(-entry.proc.pid, "SIGTERM"); } catch {}
       try { entry.proc.kill("SIGTERM"); } catch {}
-      await new Promise((r) => setTimeout(r, 800));
-      if (!entry.proc.killed && entry.proc.exitCode === null) {
+      await new Promise((r) => setTimeout(r, 1000));
+      // Check if still alive via group signal
+      let stillAlive = false;
+      try { process.kill(-entry.proc.pid, 0); stillAlive = true; } catch { stillAlive = false; }
+      if (stillAlive) {
+        try { process.kill(-entry.proc.pid, "SIGKILL"); } catch {}
         try { entry.proc.kill("SIGKILL"); } catch {}
+        await new Promise((r) => setTimeout(r, 500));
       }
       return { ok: true, id: args.id, stopped: true, exitCode: entry.proc.exitCode };
     }
