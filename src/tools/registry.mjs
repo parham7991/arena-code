@@ -10,6 +10,9 @@ import { askTool } from "./ask.mjs";
 import { processTool } from "./process.mjs";
 import { testTool } from "./test.mjs";
 import { diagnosticsTool } from "./diagnostics.mjs";
+import { gitTool } from "./git.mjs";
+import { lspHoverTool, lspGotoTool } from "./lsp.mjs";
+import { depsTool } from "./deps.mjs";
 
 export const toolRegistry = new Map();
 
@@ -21,7 +24,7 @@ export function registerTool(tool) {
   return tool;
 }
 
-[readTool, writeTool, editTool, bashTool, globTool, grepTool, askTool, processTool, testTool, diagnosticsTool].forEach(registerTool);
+[readTool, writeTool, editTool, bashTool, globTool, grepTool, askTool, processTool, testTool, diagnosticsTool, gitTool, lspHoverTool, lspGotoTool, depsTool].forEach(registerTool);
 
 /** Return the array of OpenAI-style tool definitions ({type:"function", function}). */
 export function getToolSchemas() {
